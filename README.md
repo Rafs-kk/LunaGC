@@ -1,6 +1,6 @@
 # LunaGC-6.0.0 WIP
 
-# Notice: Development halted in favor of the upcoming release (6.1)
+# Notice: Development halted in favor of the upcoming release (6.1 [ Check the [6.1.0 branch](https://github.com/pmagixc/LunaGC/tree/6.1.0) ] )
 
 ## Updated version of Grasscutters, with some new features implemented.
 Old Discord for LunaGC https://discord.gg/7D5gkyJR5Y (don't ask for support there, instead create an issue in this repository)
