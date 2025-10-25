@@ -36,19 +36,19 @@ Contribute if you want/can...
 - Have fun (or don't)
 
 ### Patching the game
-- Put [Astrolabe.dll](https://github.com/pmagixc/LunaGC_6.0.0/raw/main/patch/Astrolabe.dll) in the game directory
+- Put [Astrolabe.dll](https://github.com/pmagixc/LunaGC/raw/6.0.0/patch/Astrolabe.dll) in the game directory
 - To "disable" the patch, just rename Astrolabe.dll to something else so it's not a DLL or don't name it Astrolabe (for example Astrolabe.deleleu / astrollable.dll)
 
 ### Getting started
 
 - Clone the repository (install [Git](https://git-scm.com) first )
-  
+
   ```
-  git clone https://github.com/pmagixc/LunaGC_6.0.0.git
+  git clone https://github.com/pmagixc/LunaGC.git -b 6.0.0
   ```
-  
+
 - Now you can continue with the steps below.
-  
+
 
 ### Compile the actual Server
 
@@ -57,16 +57,16 @@ Contribute if you want/can...
 [Java Development Kit 17 | JDK](https://oracle.com/java/technologies/javase/jdk17-archive-downloads.html) or higher
 
 - **Sidenote**: Handbook generation may fail on some systems. To disable handbook generation, append `-PskipHandbook=1` to the `gradlew jar` command.
-  
+
 - **For Windows**:
-  
+
   ```shell
   .\gradlew.bat
   .\gradlew.bat jar
   ```
-  
+
 - **For Linux**:
-  
+
   ```bash
   chmod +x gradlew
   ./gradlew
