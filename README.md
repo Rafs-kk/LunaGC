@@ -1,18 +1,24 @@
-# LunaGC-6.0.0 WIP
+# LunaGC-6.0.0
 
-# STATUS: Since 6.2 has started, I no longer have 6.1 client meaning I cannot test whatever I change and cannot fix stuff (and this applies to 6.0 too obviously) for example fishing which is just extremely and unnecessarily hard to fix without a packet log of said version (6.0/1). If there's anyone that is willing to put up with my testing requests, I will attempt to fix said issues, so let me know either through an issue/discord if you have my username.
+This is a personal fork of LunaGC for 6.0. I made this because I mostly play on this version, and I wanted to fix a few lingering bugs that affected normal gameplay.
 
-# ABOUT 6.2 (and beyond): I will not continue to update this ps to upcoming versions due to lack of motivation, time and other reasons, unless heavily and I mean heavily requested, I will attempt to make a minimal 6.2 ps but I don't think anyone would want to use it.
+Changes:
 
-# Notice: Development halted in favor of the upcoming release (6.1 [ Check the [6.1.0 branch](https://github.com/pmagixc/LunaGC/tree/6.1.0) ] )
+* Restores the TrifleGadget item payload for dropped items.
+* Fixes enemy drops being stuck in midair and unable to be picked up.
+* Fixes chest loot appearing as scene props instead of proper pickup items.
+
+Tested:
+
+* Enemy drops can be picked up normally.
+* Mora drops are collected correctly.
+* Chest rewards can be picked up after opening chests.
 
 ## Updated version of Grasscutters, with some new features implemented.
 Old Discord for LunaGC https://discord.gg/7D5gkyJR5Y (don't ask for support there, instead create an issue in this repository)
 
 Features and functionality of the ps is not guaranteed, try it yourself to see what works and what doesnt.
 This is possibly the only public PS with updated mob and gadget spawns! (Up to Version 5.4)
-
-Contribute if you want/can...
 
 # Outstanding bug(s) hall of fame:
 - Abyss (as expected) -  wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
@@ -96,3 +102,5 @@ Contribute if you want/can...
 proto Repository [hk4e-protos](https://gitlab.com/kitkat-multiverse/genshin-protocol)
 
 patch Repository [hk4e-patch-universal](https://github.com/oureveryday/hk4e-patch-universal) (and credit to Hartie95 for fixing it)
+
+Original repository [pmagixc](https://github.com/pmagixc/LunaGC)
