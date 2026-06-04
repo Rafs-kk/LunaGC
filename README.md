@@ -11,7 +11,7 @@ Changes:
 Tested:
 
 * Enemy drops can be picked up normally.
-* Mora drops are collected correctly.
+* Mora and Primogem drops are collected correctly.
 * Chest rewards can be picked up after opening chests.
 
 ## Updated version of Grasscutters, with some new features implemented.
