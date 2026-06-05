@@ -11,6 +11,8 @@ Changes:
 * Adds server-side drop handling for break-required gather objects, such as ores and mineral nodes.
 * Prevents break-required gather objects from being collected directly without breaking them first.
 * Adds simplified mining durability logic based on weapon type.
+* Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5 resources.
+* Fixes Lauma's basic attacks not working correctly in-game.
 
 Tested:
 
@@ -23,6 +25,7 @@ Tested:
 * Claymores break ores faster than swords and polearms.
 * Bows and catalysts can damage ores more slowly, using reduced durability damage.
 * Normal overworld materials, such as Starconch-style pickups, still collect normally.
+* Lauma's normal attack string works correctly in-game after replacing the config.
 
 Note: Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 
