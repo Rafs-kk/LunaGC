@@ -18,6 +18,7 @@ import emu.grasscutter.game.dungeons.challenge.WorldChallenge;
 import emu.grasscutter.game.dungeons.enums.DungeonPassConditionType;
 import emu.grasscutter.game.entity.*;
 import emu.grasscutter.game.entity.gadget.GadgetWorktop;
+import emu.grasscutter.game.entity.gadget.GadgetGatherObject;
 import emu.grasscutter.game.inventory.GameItem;
 import emu.grasscutter.game.managers.blossom.BlossomManager;
 import emu.grasscutter.game.player.Player;
@@ -538,16 +539,33 @@ public class Scene {
                 world.getServer().getDropSystemLegacy().callDrop(monster);
             }
         }
+		
+		if (target instanceof EntityGadget gadget
+				&& gadget.getContent() instanceof GadgetGatherObject gatherObject
+				&& attackerId > 0
+				&& gatherObject.requiresBreaking()) {
 
-        if (target instanceof EntityGadget gadget) {
-            if (gadget.getMetaGadget() != null) {
-                world
-                        .getServer()
-                        .getDropSystem()
-                        .handleChestDrop(
-                                gadget.getMetaGadget().drop_id, gadget.getMetaGadget().drop_count, gadget);
-            }
-        }
+			Player dropOwner = this.getWorld().getHost();
+
+			if (attacker instanceof EntityAvatar avatarAttacker) {
+				dropOwner = avatarAttacker.getPlayer();
+			} else if (attacker instanceof EntityClientGadget clientGadgetAttacker) {
+				dropOwner = clientGadgetAttacker.getOwner();
+			}
+
+			gatherObject.dropItems(dropOwner, false);
+
+		} else if (target instanceof EntityGadget gadget) {
+			if (gadget.getMetaGadget() != null) {
+				world
+						.getServer()
+						.getDropSystem()
+						.handleChestDrop(
+								gadget.getMetaGadget().drop_id,
+								gadget.getMetaGadget().drop_count,
+								gadget);
+			}
+		}
 
         // Remove entity from world
         this.removeEntity(target);
@@ -856,9 +874,15 @@ public class Scene {
                     }
                     gadget.buildContent();
 
-                    gadget.setFightProperty(FightProperty.FIGHT_PROP_BASE_HP, Float.POSITIVE_INFINITY);
-                    gadget.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, Float.POSITIVE_INFINITY);
-                    gadget.setFightProperty(FightProperty.FIGHT_PROP_MAX_HP, Float.POSITIVE_INFINITY);
+					boolean isBreakRequiredGatherObject =
+							gadget.getContent() instanceof GadgetGatherObject gatherObject
+									&& gatherObject.requiresBreaking();
+
+					if (!isBreakRequiredGatherObject) {
+						gadget.setFightProperty(FightProperty.FIGHT_PROP_BASE_HP, Float.POSITIVE_INFINITY);
+						gadget.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, Float.POSITIVE_INFINITY);
+						gadget.setFightProperty(FightProperty.FIGHT_PROP_MAX_HP, Float.POSITIVE_INFINITY);
+					}
 
                     entity = gadget;
                     blossomManager.initBlossom(gadget);

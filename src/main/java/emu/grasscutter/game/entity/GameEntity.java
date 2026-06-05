@@ -7,6 +7,7 @@ import emu.grasscutter.game.avatar.Avatar;
 import emu.grasscutter.game.player.Player;
 import emu.grasscutter.game.props.*;
 import emu.grasscutter.game.world.*;
+import emu.grasscutter.game.entity.gadget.GadgetGatherObject;
 import emu.grasscutter.net.proto.ChangeHpDebtsReasonOuterClass.ChangeHpDebtsReason;
 import emu.grasscutter.net.proto.ChangeHpReasonOuterClass.ChangeHpReason;
 import emu.grasscutter.net.proto.FightPropPairOuterClass.FightPropPair;
@@ -280,7 +281,7 @@ public abstract class GameEntity {
     }
 
     public void damage(float amount, int killerId, ElementType attackType) {
-        this.damage(amount, 0, attackType, PropChangeReason.PROP_CHANGE_REASON_NONE, ChangeHpReason.CHANGE_HP_REASON_NONE); 
+        this.damage(amount, killerId, attackType, PropChangeReason.PROP_CHANGE_REASON_NONE, ChangeHpReason.CHANGE_HP_REASON_NONE);
     }
 
     public void damage(float amount, PropChangeReason propChangeReason, ChangeHpReason changeHpReason) {
@@ -292,6 +293,38 @@ public abstract class GameEntity {
         if (this.getFightProperties() == null || !hasFightProperty(FightProperty.FIGHT_PROP_CUR_HP)) {
             return;
         }
+		
+		// Treat breakable gather objects as durability-based objects.
+		// This prevents a high character damage value from one-shotting every ore.
+		if (this instanceof EntityGadget gadget
+				&& gadget.getContent() instanceof GadgetGatherObject gatherObject
+				&& gatherObject.requiresBreaking()) {
+
+			float durabilityDamage = 1f;
+			GameEntity attacker = this.getScene().getEntityById(killerId);
+
+			if (attacker instanceof EntityAvatar avatarAttacker) {
+				WeaponType weaponType =
+						avatarAttacker.getAvatar().getAvatarData() != null
+								? avatarAttacker.getAvatar().getAvatarData().getWeaponType()
+								: WeaponType.WEAPON_NONE;
+
+				durabilityDamage = switch (weaponType) {
+					case WEAPON_CLAYMORE -> 6f;
+					case WEAPON_SWORD_ONE_HAND -> 2f;
+					case WEAPON_POLE -> 2f;
+					case WEAPON_BOW -> 0.1f; 
+					case WEAPON_CATALYST -> 0.1f;
+					default -> 0.1f;
+				};
+			} else if (attacker instanceof EntityClientGadget) {
+				// Skills / summoned gadgets / special effects.
+				// Keep this stronger than normal sword hits, but weaker than claymore.
+				durabilityDamage = 2f;
+			}
+
+			amount = durabilityDamage;
+		}
 
         // Invoke entity damage event.
         EntityDamageEvent event =
