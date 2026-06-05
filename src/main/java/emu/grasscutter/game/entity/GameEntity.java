@@ -315,7 +315,7 @@ public abstract class GameEntity {
 					case WEAPON_POLE -> 2f;
 					case WEAPON_BOW -> 0.1f; 
 					case WEAPON_CATALYST -> 0.1f;
-					default -> 0.1f;
+					default -> 2f;
 				};
 			} else if (attacker instanceof EntityClientGadget) {
 				// Skills / summoned gadgets / special effects.
