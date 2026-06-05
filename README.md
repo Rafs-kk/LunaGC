@@ -34,7 +34,6 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 
 # Outstanding bug(s) hall of fame:
 - Abyss (as expected) -  wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
-- Lauma's basic attacks (bad res)
 - Lunar Bloom
 
 # Read the [handbook](handbook.md)!
@@ -50,7 +49,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 - Get game version REL6.0.0 (pray you still have it)
 - Make sure to install java and set the environment variables.
 - Build the server (refer to "Compile the actual server" in this guide.)
-- Download the [Resources](https://github.com/pmagixc/LunaGC-res/tree/6.0.0), make a new folder called `resources` in the downloaded LunaGC folder and then extract the resources in that new folder.
+- Download the [Resources]([https://github.com/Rafs-kk/LunaGC-6.0-res/tree/6.0.0), make a new folder called `resources` in the downloaded LunaGC folder and then extract the resources in that new folder.
 - Set useEncryption, Questing and useInRouting to false (it should be false by default, if not then change it)
 - [Patch the game](#patching-the-game)
 - Start the server and the game, make sure to also create an account in the LunaGC console!
