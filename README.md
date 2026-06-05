@@ -13,6 +13,9 @@ Changes:
 * Adds simplified mining durability logic based on weapon type.
 * Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5 resources.
 * Fixes Lauma's basic attacks not working correctly in-game.
+* Fixes character level-up and ascension requests not being handled in 6.0.0.
+* Updates avatar upgrade and promote request opcodes for the 6.0 client.
+* Decodes 6.0 avatar upgrade/promote request fields from unknown proto fields.
 
 Tested:
 
@@ -26,8 +29,16 @@ Tested:
 * Bows and catalysts can damage ores more slowly, using reduced durability damage.
 * Normal overworld materials, such as Starconch-style pickups, still collect normally.
 * Lauma's normal attack string works correctly in-game after replacing the config.
+* Character EXP books are consumed correctly when leveling up.
+* Mora is consumed correctly during character level-up and ascension.
+* Characters can level up through the normal in-game UI.
+* Characters can ascend through the normal in-game UI.
+* Level-up and ascension animations/effects play correctly.
+* Character stats update after level-up and ascension.
 
-Note: Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
+Notes:
+* Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
+* The 6.0 client sends some avatar upgrade/promote request data through fields not mapped by the current generated proto classes, so the handlers include compatibility decoding for those fields.
 
 ## Updated version of Grasscutters, with some new features implemented.
 Old Discord for LunaGC https://discord.gg/7D5gkyJR5Y (don't ask for support there, instead create an issue in this repository)
