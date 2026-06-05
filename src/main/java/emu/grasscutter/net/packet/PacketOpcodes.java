@@ -299,7 +299,8 @@ public final class PacketOpcodes {
     public static final int DungeonPlayerDieReq = 7955;
     public static final int DungeonPlayerDieRsp = 1; // idfk its jut a retcode
     public static final int DungeonPreloadMonsterNotify = 20227;
-    public static final int AvatarUpgradeReq = 26430; 
+    public static final int AvatarUpgradeReq = 20955; 
+	public static final int AvatarPromoteReq = 28368;
 	public static final int AvatarUpgradeRsp = 9724; // prob 
 	public static final int NpcTalkReq = 2192; 
 	public static final int NpcTalkRsp = 2598; 
@@ -550,7 +551,6 @@ public final class PacketOpcodes {
     public static final int CancelFinishParentQuestNotify = 1;
     public static final int RechargeRsp = 1;
     public static final int SetPlayerHeadImageRsp = 1;  
-    public static final int AvatarPromoteReq = 1; // tbd
 	public static final int AsterLittleInfoNotify = 1;
 	public static final int BargainOfferPriceRsp = 1; 
 	public static final int BartenderGetFormulaRsp = 1;
