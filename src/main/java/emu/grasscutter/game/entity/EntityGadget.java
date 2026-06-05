@@ -191,23 +191,58 @@ public class EntityGadget extends EntityBaseGadget {
 
     // TODO refactor
     public void buildContent() {
-        if (this.getContent() != null
-                || this.getGadgetData() == null
-                || this.getGadgetData().getType() == null) {
-            return;
-        }
+		if (this.getContent() != null
+				|| this.getGadgetData() == null
+				|| this.getGadgetData().getType() == null) {
+			return;
+		}
 
-        this.content =
-                switch (this.getGadgetData().getType()) {
-                    case GatherPoint -> new GadgetGatherPoint(this);
-                    case GatherObject -> new GadgetGatherObject(this);
-                    case Worktop, SealGadget -> new GadgetWorktop(this);
-                    case RewardStatue -> new GadgetRewardStatue(this);
-                    case Chest -> new GadgetChest(this);
-                    case Gadget -> new GadgetObject(this);
-                    default -> null;
-                };
-    }
+		this.content =
+				switch (this.getGadgetData().getType()) {
+					case GatherPoint -> new GadgetGatherPoint(this);
+					case GatherObject -> new GadgetGatherObject(this);
+					case Worktop, SealGadget -> new GadgetWorktop(this);
+					case RewardStatue -> new GadgetRewardStatue(this);
+					case Chest -> new GadgetChest(this);
+					case Gadget -> new GadgetObject(this);
+					default -> null;
+				};
+
+		this.fixBreakableGatherObjectHp();
+	}
+	
+	private void fixBreakableGatherObjectHp() {
+		if (!(this.content instanceof GadgetGatherObject gatherObject)) {
+			return;
+		}
+
+		if (!gatherObject.requiresBreaking()) {
+			return;
+		}
+
+		float fixedHp = switch (gatherObject.getItemId()) {
+			case 101001 -> 6f; // Iron Chunk
+			case 101002 -> 7f; // White Iron Chunk
+			case 101003 -> 18f; // Crystal Chunk
+			case 101004 -> 12f; // Magical Crystal Chunk
+			case 101005 -> 18f; // local specialty mineral-style fallback if IDs differ
+			default -> 12f;
+		};
+
+		this.setFightProperty(FightProperty.FIGHT_PROP_BASE_HP, fixedHp);
+		this.setFightProperty(FightProperty.FIGHT_PROP_MAX_HP, fixedHp);
+		this.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, fixedHp);
+		this.setLockHP(false);
+		/*
+		Grasscutter.getLogger().info(
+				"[ORE HP FIX] gadgetId={}, pointType={}, itemId={}, hp={}",
+				this.getGadgetId(),
+				this.getPointType(),
+				gatherObject.getItemId(),
+				fixedHp
+		);
+		*/
+	}
 
     @Override
     public void onInteract(Player player, GadgetInteractReq interactReq) {
