@@ -78,7 +78,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 - Clone the repository (install [Git](https://git-scm.com) first )
 
   ```
-  git clone https://github.com/pmagixc/LunaGC.git -b 6.0.0
+  git clone https://github.com/Rafs-kk/LunaGC.git -b 6.0.0
   ```
 
 - Now you can continue with the steps below.
