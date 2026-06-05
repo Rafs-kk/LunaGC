@@ -60,7 +60,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 - Get [Java 17](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
 - Get [MongoDB Community Server](https://www.mongodb.com/try/download/community)
 - Get [NodeJS](https://nodejs.org/dist/v20.15.0/node-v20.15.0-x64.msi) (For handbook generation)
-- Get game version REL6.0.0 (pray you still have it)
+- Get game version [REL6.0.0](https://archive.heavens-era.com/Tenshi's%20Archive/Live%20Service/miHoYo/Genshin%20Impact/Game%20Files/OS/6.0.0)
 - Make sure to install java and set the environment variables.
 - Build the server (refer to "Compile the actual server" in this guide.)
 - Download the [Resources](https://github.com/Rafs-kk/LunaGC-6.0-res/tree/6.0.0), make a new folder called `resources` in the downloaded LunaGC folder and then extract the resources in that new folder.
