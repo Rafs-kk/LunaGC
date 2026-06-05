@@ -34,9 +34,8 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 
 # Outstanding bug(s) hall of fame:
 - Abyss (as expected) -  wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
-
-# Outstanding critical stuff that does not work hall of fame:
-- Lauma and Flins (bad res)
+- Lauma's basic attacks (bad res)
+- Lunar Bloom
 
 # Read the [handbook](handbook.md)!
 
