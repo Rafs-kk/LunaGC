@@ -7,12 +7,27 @@ Changes:
 * Restores the TrifleGadget item payload for dropped items.
 * Fixes enemy drops being stuck in midair and unable to be picked up.
 * Fixes chest loot appearing as scene props instead of proper pickup items.
+* Fixes breakable ores not being destroyed when their HP reaches zero.
+* Adds server-side drop handling for break-required gather objects, such as ores and mineral nodes.
+* Prevents break-required gather objects from being collected directly without breaking them first.
+* Adds simplified mining durability logic based on weapon type.
+* Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5 resources.
+* Fixes Lauma's basic attacks not working correctly in-game.
 
 Tested:
 
 * Enemy drops can be picked up normally.
 * Mora and Primogem drops are collected correctly.
 * Chest rewards can be picked up after opening chests.
+* Crystal Chunk ores can be broken and drop pickupable loot.
+* Cor Lapis-style gather objects can no longer be collected directly without breaking.
+* Ore drops can be picked up normally after breaking the node.
+* Claymores break ores faster than swords and polearms.
+* Bows and catalysts can damage ores more slowly, using reduced durability damage.
+* Normal overworld materials, such as Starconch-style pickups, still collect normally.
+* Lauma's normal attack string works correctly in-game after replacing the config.
+
+Note: Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 
 ## Updated version of Grasscutters, with some new features implemented.
 Old Discord for LunaGC https://discord.gg/7D5gkyJR5Y (don't ask for support there, instead create an issue in this repository)
@@ -22,9 +37,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 
 # Outstanding bug(s) hall of fame:
 - Abyss (as expected) -  wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
-
-# Outstanding critical stuff that does not work hall of fame:
-- Lauma and Flins (bad res)
+- Lunar Bloom
 
 # Read the [handbook](handbook.md)!
 
@@ -39,7 +52,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 - Get game version REL6.0.0 (pray you still have it)
 - Make sure to install java and set the environment variables.
 - Build the server (refer to "Compile the actual server" in this guide.)
-- Download the [Resources](https://github.com/pmagixc/LunaGC-res/tree/6.0.0), make a new folder called `resources` in the downloaded LunaGC folder and then extract the resources in that new folder.
+- Download the [Resources](https://github.com/Rafs-kk/LunaGC-6.0-res/tree/6.0.0), make a new folder called `resources` in the downloaded LunaGC folder and then extract the resources in that new folder.
 - Set useEncryption, Questing and useInRouting to false (it should be false by default, if not then change it)
 - [Patch the game](#patching-the-game)
 - Start the server and the game, make sure to also create an account in the LunaGC console!
