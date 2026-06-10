@@ -9,9 +9,12 @@ public abstract class ItemUseSelectItems extends ItemUseAction {
     protected int[] optionItemIds;
 
     protected int getItemId(int index) {
-        if ((optionItemIds == null) || (index < 0) || (index > optionItemIds.length)) return INVALID;
-        return this.optionItemIds[index];
-    }
+		if ((optionItemIds == null) || (index < 0) || (index >= optionItemIds.length)) {
+			return INVALID;
+		}
+
+		return this.optionItemIds[index];
+	}
 
     protected int getItemCount(int index) {
         return 1;
@@ -29,10 +32,10 @@ public abstract class ItemUseSelectItems extends ItemUseAction {
     }
 
     @Override
-    public boolean useItem(UseItemParams params) {
-        var itemStack = this.getItemStack(params.optionId - 1, params.count);
-        if (itemStack == null) return false;
-
-        return params.player.getInventory().addItem(itemStack, ActionReason.Shop);
-    }
+	public boolean useItem(UseItemParams params) {
+		// optionId is normalized to a zero-based index by HandlerUseItemReq.
+		var itemStack = this.getItemStack(params.optionId, params.count);
+		if (itemStack == null) return false;
+		return params.player.getInventory().addItem(itemStack, ActionReason.Shop);
+	}
 }
