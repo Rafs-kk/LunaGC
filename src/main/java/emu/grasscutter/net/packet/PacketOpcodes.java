@@ -1329,7 +1329,7 @@ public final class PacketOpcodes {
     public static final int GachaActivityTakeRewardReq = 1;
     public static final int GachaActivityTakeRewardRsp = 1;
     public static final int GachaActivityUpdateElemNotify = 1;
-    public static final int GadgetAutoPickDropInfoNotify = 1;
+    public static final int GadgetAutoPickDropInfoNotify = 22337;
     public static final int GadgetChainLevelChangeNotify = 1;
     public static final int GadgetChainLevelUpdateNotify = 1;
     public static final int GadgetChangeLevelTagReq = 1;
