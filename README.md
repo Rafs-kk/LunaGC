@@ -14,8 +14,12 @@ Changes:
 * Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5 resources.
 * Fixes Lauma's basic attacks not working correctly in-game.
 * Fixes character level-up and ascension requests not being handled in 6.0.0.
-* Updates avatar upgrade and promote request opcodes for the 6.0 client.
+* Updates avatar upgrade and promote request opcodes for the 6.0.0 client.
 * Decodes 6.0 avatar upgrade/promote request fields from unknown proto fields.
+* Fixes the domain reward "Obtained" screen not appearing after claiming Domain of Blessing, Forgery, or Mastery rewards.
+* Adds REL6.0-compatible handling for GadgetAutoPickDropInfoNotify.
+* Updates GadgetAutoPickDropInfoNotify opcode.
+* Manually encodes the reward item list using the 6.0-compatible item_list field number.
 
 Tested:
 
@@ -35,13 +39,15 @@ Tested:
 * Characters can ascend through the normal in-game UI.
 * Level-up and ascension animations/effects play correctly.
 * Character stats update after level-up and ascension.
+* Domain rewards are still granted correctly after interacting with the reward tree/statue.
+* The "Obtained" reward screen appears after claiming domain rewards.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 * The 6.0 client sends some avatar upgrade/promote request data through fields not mapped by the current generated proto classes, so the handlers include compatibility decoding for those fields.
+* The current domain fix manually encodes the packet payload instead of regenerating all proto classes, because the existing generated 6.0.0 proto mapping does not match the client’s expected field layout for this packet.
 
 ## Updated version of Grasscutters, with some new features implemented.
-Old Discord for LunaGC https://discord.gg/7D5gkyJR5Y (don't ask for support there, instead create an issue in this repository)
 
 Features and functionality of the ps is not guaranteed, try it yourself to see what works and what doesnt.
 This is possibly the only public PS with updated mob and gadget spawns! (Up to Version 5.4)
