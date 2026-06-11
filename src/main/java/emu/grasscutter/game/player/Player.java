@@ -1104,7 +1104,7 @@ public class Player implements PlayerHook, FieldFetch {
             .setMpSettingType(this.getMpSetting())
             .setNameCardId(this.getNameCardId())
             .setSignature(this.getSignature())
-            .setProfilePicture(ProfilePicture.newBuilder().setHeadImageId(this.getHeadImage()));
+            .setProfilePicture(this.getProfilePicture());
 
         if (this.getWorld() != null) {
             onlineInfo.setCurPlayerNumInWorld(getWorld().getPlayerCount());
@@ -1159,7 +1159,7 @@ public class Player implements PlayerHook, FieldFetch {
 
         return SocialDetail.newBuilder()
             .setUid(this.getUid())
-            .setProfilePicture(ProfilePicture.newBuilder().setHeadImageId(this.getHeadImage()))
+            .setProfilePicture(this.getProfilePicture())
             .setNickname(this.getNickname())
             .setSignature(this.getSignature())
             .setLevel(this.getLevel())
@@ -1469,12 +1469,15 @@ public class Player implements PlayerHook, FieldFetch {
         session.send(new PacketQuestListNotify(this));
         session.send(new PacketQuestGlobalVarNotify(this));
         session.send(new PacketCodexDataFullNotify(this));
-        session.send(new PacketAllWidgetDataNotify(this));
+//      session.send(new PacketAllWidgetDataNotify(this));
+
+		session.send(new PacketGetWidgetSlotRsp(this));
+		session.send(new PacketGetWidgetQuickSlotListRsp(this));
 
         //Achievements
         this.achievements.onLogin(this);
 
-        session.send(new PacketWidgetGadgetAllDataNotify());
+ //     session.send(new PacketWidgetGadgetAllDataNotify());
         session.send(new PacketCombineDataNotify(this.unlockedCombines));
         session.send(new PacketGetChatEmojiCollectionRsp(this.getChatEmojiIdList()));
         this.forgingManager.sendForgeDataNotify();
@@ -1669,6 +1672,21 @@ public class Player implements PlayerHook, FieldFetch {
             return false;
         }
     }
+	
+	public ProfilePicture.Builder getProfilePicture() {
+		int id = this.getHeadImage();
+
+		var profilePicture = ProfilePicture.newBuilder();
+
+		// Existing saves/defaults store normal character portraits as avatar IDs,
+		// for example 10000005 / 10000007.
+		if (GameData.getAvatarDataMap().containsKey(id)) {
+			return profilePicture.setAvatarId(id);
+		}
+
+		// Anything else is treated as a special profile picture/head image.
+		return profilePicture.setHeadImageId(id);
+	}
 
     @Override
     public boolean equals(Object obj) {

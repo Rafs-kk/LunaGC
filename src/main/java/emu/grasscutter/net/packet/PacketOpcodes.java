@@ -536,7 +536,7 @@ public final class PacketOpcodes {
     public static final int PlayerReportRsp = 8507;
     // :skull:
 
-    // todo (never)
+    // (incomplete)
     public static final int PersonalLineNewUnlockNotify = 1;
     public static final int TowerDailyRewardProgressChangeNotify = 1;
     public static final int DungeonDataNotify = 1;
@@ -550,7 +550,7 @@ public final class PacketOpcodes {
     public static final int FindHilichurlAcceptQuestNotify = 1;
     public static final int CancelFinishParentQuestNotify = 1;
     public static final int RechargeRsp = 1;
-    public static final int SetPlayerHeadImageRsp = 1;  
+    public static final int SetPlayerHeadImageRsp = 28482;
 	public static final int AsterLittleInfoNotify = 1;
 	public static final int BargainOfferPriceRsp = 1; 
 	public static final int BartenderGetFormulaRsp = 1;
@@ -702,7 +702,7 @@ public final class PacketOpcodes {
     public static final int AllSeenMonsterNotify = 1;
     public static final int AllShareCDDataNotify = 1;
     public static final int AllWidgetBackgroundActiveStateNotify = 1;
-    public static final int AllWidgetDataNotify = 1;
+    public static final int AllWidgetDataNotify = 23365;
     public static final int AnchorPointDataNotify = 1;
     public static final int AnchorPointOpReq = 1;
     public static final int AnchorPointOpRsp = 1;
@@ -1415,8 +1415,8 @@ public final class PacketOpcodes {
     public static final int GetPlayerBlacklistReq = 1;
     public static final int GetPlayerBlacklistRsp = 1;
     public static final int GetPlayerHomeCompInfoReq = 1;
-    public static final int GetProfilePictureDataReq = 1;
-    public static final int GetProfilePictureDataRsp = 1;
+    public static final int GetProfilePictureDataReq = 23203;
+    public static final int GetProfilePictureDataRsp = 2156;
     public static final int GetPushTipsRewardReq = 1;
     public static final int GetPushTipsRewardRsp = 1;
     public static final int GetRecommendCustomDungeonReq = 1;
@@ -1445,8 +1445,8 @@ public final class PacketOpcodes {
     public static final int GetUgcDungeonBriefListRsp = 1;
     public static final int GetUgcReq = 1;
     public static final int GetUgcRsp = 1;
-    public static final int GetWidgetQuickSlotListRsp = 1;
-    public static final int GetWidgetSlotRsp = 1;
+    public static final int GetWidgetQuickSlotListRsp = 22601;
+    public static final int GetWidgetSlotRsp = 5779;
     public static final int GiveUpRoguelikeDungeonCardReq = 1;
     public static final int GiveUpRoguelikeDungeonCardRsp = 1;
     public static final int GivingRecordChangeNotify = 1;
@@ -1911,7 +1911,7 @@ public final class PacketOpcodes {
     public static final int PotionSaveDungeonResultReq = 1;
     public static final int PotionSaveDungeonResultRsp = 1;
     public static final int PrivateChatRsp = 1;
-    public static final int ProfilePictureChangeNotify = 1;
+    public static final int ProfilePictureChangeNotify = 5763;
     public static final int ProfilePictureUpdateNotify = 1;
     public static final int ProjectorOptionReq = 1;
     public static final int ProjectorOptionRsp = 1;
@@ -2128,8 +2128,8 @@ public final class PacketOpcodes {
     public static final int SetUpLunchBoxWidgetRsp = 1;
     public static final int SetWidgetQuickSlotListReq = 1;
     public static final int SetWidgetQuickSlotListRsp = 1;
-    public static final int SetWidgetSlotReq = 1;
-    public static final int SetWidgetSlotRsp = 1;
+    public static final int SetWidgetSlotReq = 8693;
+    public static final int SetWidgetSlotRsp = 28587;
     public static final int ShowClientGuideNotify = 1;
     public static final int ShowClientTutorialNotify = 1;
     public static final int ShowMessageNotify = 1;
@@ -2418,7 +2418,7 @@ public final class PacketOpcodes {
     public static final int WidgetQuickHitTreeRsp = 1;
     public static final int WidgetReportReq = 1;
     public static final int WidgetReportRsp = 1;
-    public static final int WidgetSlotChangeNotify = 1;
+    public static final int WidgetSlotChangeNotify = 1465;
     public static final int WidgetUpdateExtraCDReq = 1;
     public static final int WidgetUpdateExtraCDRsp = 1;
     public static final int WidgetUseAttachAbilityGroupChangeNotify = 1;

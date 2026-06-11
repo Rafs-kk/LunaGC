@@ -1,37 +1,108 @@
 package emu.grasscutter.server.packet.send;
 
+import com.google.protobuf.CodedOutputStream;
+import emu.grasscutter.Grasscutter;
 import emu.grasscutter.game.player.Player;
 import emu.grasscutter.net.packet.*;
-import emu.grasscutter.net.proto.*;
-import java.util.List;
+
+import java.io.ByteArrayOutputStream;
+import java.util.Set;
 
 public class PacketGetWidgetSlotRsp extends BasePacket {
+
+    private static final int WIDGET_SLOT_TAG_QUICK_USE = 0;
+
+    // Companion/pet-like gadgets that should not be reported as normal quick-use gadgets.
+    private static final Set<Integer> COMPANION_WIDGET_IDS = Set.of(
+            220014, // Mini Seelie: Dayflower
+            220015, // Mini Seelie: Rosé
+            220016, // Mini Seelie: Curcuma
+            220023, // Endora
+            220038, // Mini Seelie: Viola
+            220045, // Shiki Koshou
+            220062, // Mini Seelie: Moss
+            220072, // Jinni in the Magic Bottle — Liloupar
+            220074, // Cloud Retainer's Damasked Device
+            220084, // Itty Bitty Octobaby
+            220096, // Mini Seelie: Brilliance
+            220105  // Firstborn Firesprite
+    );
 
     public PacketGetWidgetSlotRsp(Player player) {
         super(PacketOpcodes.GetWidgetSlotRsp);
 
-        GetWidgetSlotRspOuterClass.GetWidgetSlotRsp.Builder proto =
-                GetWidgetSlotRspOuterClass.GetWidgetSlotRsp.newBuilder();
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            CodedOutputStream output = CodedOutputStream.newInstance(baos);
 
-        if (player.getWidgetId()
-                == 0) { // TODO: check this logic later, it was null-checking an int before which made it
-            // dead code
-            proto.addAllSlotList(List.of());
-        } else {
-            proto.addSlotList(
-                    WidgetSlotDataOuterClass.WidgetSlotData.newBuilder()
-                            .setIsActive(true)
-                            .setMaterialId(player.getWidgetId())
-                            .build());
+            // REL6.0 candidate:
+            // CmdID: 5779
+            // message JBGIBNPJNJO {
+            //     repeated WidgetSlotData slot_list = 2;
+            //     int32 retcode = 3;
+            // }
 
-            proto.addSlotList(
-                    WidgetSlotDataOuterClass.WidgetSlotData.newBuilder()
-                            .setTag(WidgetSlotTagOuterClass.WidgetSlotTag.WIDGET_SLOT_TAG_ATTACH_AVATAR)
-                            .build());
+            int quickUseMaterialId = player.getWidgetId();
+
+            if (isCompanionWidget(quickUseMaterialId)) {
+                Grasscutter.getLogger().warn(
+                        "[WIDGET SLOT DEBUG] Clearing companion materialId={} from quick-use slot",
+                        quickUseMaterialId
+                );
+
+                player.setWidgetId(0);
+                quickUseMaterialId = 0;
+            }
+
+            // Success retcode.
+            output.writeInt32(3, 0);
+
+            // Only send a real quick-use slot when one exists.
+            // Do not send empty slot objects; those caused blank/white-square UI during testing.
+            if (quickUseMaterialId > 0) {
+                byte[] quickUseSlot = buildWidgetSlotData(
+                        quickUseMaterialId,
+                        WIDGET_SLOT_TAG_QUICK_USE,
+                        true
+                );
+
+                output.writeByteArray(2, quickUseSlot);
+            }
+
+            output.flush();
+            this.setData(baos.toByteArray());
+
+            Grasscutter.getLogger().info(
+                    "[WIDGET SLOT DEBUG] GetWidgetSlotRsp quickUseMaterialId={}, payloadLen={}",
+                    quickUseMaterialId,
+                    baos.size()
+            );
+        } catch (Exception e) {
+            Grasscutter.getLogger().error("Failed to build GetWidgetSlotRsp payload", e);
         }
+    }
 
-        GetWidgetSlotRspOuterClass.GetWidgetSlotRsp protoData = proto.build();
+    private byte[] buildWidgetSlotData(int materialId, int slotTag, boolean active) throws Exception {
+        ByteArrayOutputStream slotBaos = new ByteArrayOutputStream();
+        CodedOutputStream slotOutput = CodedOutputStream.newInstance(slotBaos);
 
-        this.setData(protoData);
+        // REL6.0 WidgetSlotData:
+        // message MOFKDLOMBNB {
+        //     uint32 cd_over_time = 1;
+        //     uint32 material_id = 5;
+        //     WidgetSlotTag tag = 10;
+        //     bool is_active = 13;
+        // }
+
+        slotOutput.writeUInt32(5, materialId);
+        slotOutput.writeEnum(10, slotTag);
+        slotOutput.writeBool(13, active);
+
+        slotOutput.flush();
+        return slotBaos.toByteArray();
+    }
+
+    private boolean isCompanionWidget(int materialId) {
+        return COMPANION_WIDGET_IDS.contains(materialId);
     }
 }

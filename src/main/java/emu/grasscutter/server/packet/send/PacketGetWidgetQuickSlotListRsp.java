@@ -8,7 +8,7 @@ import emu.grasscutter.net.packet.*;
 import java.io.ByteArrayOutputStream;
 import java.util.Set;
 
-public class PacketAllWidgetDataNotify extends BasePacket {
+public class PacketGetWidgetQuickSlotListRsp extends BasePacket {
 
     private static final int WIDGET_SLOT_TAG_QUICK_USE = 0;
 
@@ -28,8 +28,8 @@ public class PacketAllWidgetDataNotify extends BasePacket {
             220105  // Firstborn Firesprite
     );
 
-    public PacketAllWidgetDataNotify(Player player) {
-        super(PacketOpcodes.AllWidgetDataNotify);
+    public PacketGetWidgetQuickSlotListRsp(Player player) {
+        super(PacketOpcodes.GetWidgetQuickSlotListRsp);
 
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -39,7 +39,7 @@ public class PacketAllWidgetDataNotify extends BasePacket {
 
             if (isCompanionWidget(quickUseMaterialId)) {
                 Grasscutter.getLogger().warn(
-                        "[ALL WIDGET DEBUG] Clearing companion materialId={} from quick-use slot",
+                        "[WIDGET QUICKLIST DEBUG] Clearing companion materialId={} from quick-use slot",
                         quickUseMaterialId
                 );
 
@@ -47,35 +47,31 @@ public class PacketAllWidgetDataNotify extends BasePacket {
                 quickUseMaterialId = 0;
             }
 
-            // REL6.0 candidate:
-            // CmdID: 23365
-            // message ECENPPGAHAI {
-            //     repeated WidgetSlotData slot_list = 12;
-            //     ...
-            // }
-            //
-            // Only send a real quick-use slot when one exists.
-            // Do not send empty slot objects.
             if (quickUseMaterialId > 0) {
-                byte[] quickUseSlot = buildWidgetSlotData(
+                byte[] slotData = buildWidgetSlotData(
                         quickUseMaterialId,
                         WIDGET_SLOT_TAG_QUICK_USE,
                         true
                 );
 
-                output.writeByteArray(12, quickUseSlot);
+                // REL6.0:
+                // CmdID: 22601
+                // message FCBJONFDPFM {
+                //     repeated WidgetSlotData slot_list = 12;
+                // }
+                output.writeByteArray(12, slotData);
             }
 
             output.flush();
             this.setData(baos.toByteArray());
 
             Grasscutter.getLogger().info(
-                    "[ALL WIDGET DEBUG] AllWidgetDataNotify quickUseMaterialId={}, payloadLen={}",
+                    "[WIDGET QUICKLIST DEBUG] quickUseMaterialId={}, payloadLen={}",
                     quickUseMaterialId,
                     baos.size()
             );
         } catch (Exception e) {
-            Grasscutter.getLogger().error("Failed to build AllWidgetDataNotify payload", e);
+            Grasscutter.getLogger().error("Failed to build GetWidgetQuickSlotListRsp payload", e);
         }
     }
 

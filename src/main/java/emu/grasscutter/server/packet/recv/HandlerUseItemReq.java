@@ -25,7 +25,7 @@ public class HandlerUseItemReq extends PacketHandler {
 		if (req.getAKCOAFJNBMICount() > 0) {
 			selectedOptionIdx = req.getAKCOAFJNBMI(0) - 1;
 		}
-		/*
+
 		Grasscutter.getLogger().info(
 				"[USE ITEM DEBUG] guid={}, targetGuid={}, count={}, optionIdx={}, rawSelectList={}, normalizedOptionIdx={}, enterMpDungeonTeam={}, payloadLen={}",
 				req.getGuid(),
@@ -37,7 +37,7 @@ public class HandlerUseItemReq extends PacketHandler {
 				req.getIsEnterMpDungeonTeam(),
 				payload == null ? 0 : payload.length
 		);
-		*/
+
 		GameItem useItem =
 				session
 						.getServer()
@@ -49,12 +49,12 @@ public class HandlerUseItemReq extends PacketHandler {
 								count,
 								selectedOptionIdx,
 								req.getIsEnterMpDungeonTeam());
-		/*
+
 		Grasscutter.getLogger().info(
 				"[USE ITEM DEBUG] result={}",
 				useItem != null ? "SUCCESS itemId=" + useItem.getItemId() : "FAILED"
 		);
-		*/
+
 		if (useItem != null) {
 			session.send(new PacketUseItemRsp(req.getTargetGuid(), useItem));
 		} else {
