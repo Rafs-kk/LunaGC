@@ -899,11 +899,8 @@ public class Scene {
 					}
 					gadget.buildContent();
 
-					boolean isBreakRequiredGatherObject =
-							gadget.getContent() instanceof GadgetGatherObject gatherObject
-									&& gatherObject.requiresBreaking();
-
-					if (!isBreakRequiredGatherObject) {
+					if (gadget.getContent() instanceof GadgetGatherObject gatherObject
+							&& !gatherObject.requiresBreaking()) {
 						gadget.setFightProperty(FightProperty.FIGHT_PROP_BASE_HP, Float.POSITIVE_INFINITY);
 						gadget.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, Float.POSITIVE_INFINITY);
 						gadget.setFightProperty(FightProperty.FIGHT_PROP_MAX_HP, Float.POSITIVE_INFINITY);
