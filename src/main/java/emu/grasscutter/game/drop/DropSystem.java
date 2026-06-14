@@ -3,6 +3,7 @@ package emu.grasscutter.game.drop;
 import emu.grasscutter.Grasscutter;
 import emu.grasscutter.data.*;
 import emu.grasscutter.data.common.DropItemData;
+import emu.grasscutter.data.server.DropTableExcelConfigData;
 import emu.grasscutter.data.excels.*;
 import emu.grasscutter.game.entity.*;
 import emu.grasscutter.game.inventory.*;
@@ -16,6 +17,7 @@ import java.util.*;
 
 public final class DropSystem extends BaseGameSystem {
     private final Int2ObjectMap<DropTableData> dropTable;
+	private final Int2ObjectMap<DropTableExcelConfigData> serverDropTable;
     private final Map<String, List<BaseDropData>> chestReward;
     private final Map<String, List<BaseDropData>> monsterDrop;
     private final Random rand;
@@ -28,6 +30,7 @@ public final class DropSystem extends BaseGameSystem {
 
         this.rand = new Random();
         this.dropTable = GameData.getDropTableDataMap();
+		this.serverDropTable = GameData.getDropTableExcelConfigDataMap();
         this.chestReward = new HashMap<>();
         this.monsterDrop = new HashMap<>();
 
@@ -83,32 +86,55 @@ public final class DropSystem extends BaseGameSystem {
     }
 
     public boolean handleMonsterDrop(EntityMonster monster) {
-        int dropId;
-        int level = monster.getLevel();
-        SceneMonster sceneMonster = monster.getMetaMonster();
-        if (sceneMonster != null) {
-            if (sceneMonster.drop_tag != null) {
-                dropId = queryDropData(sceneMonster.drop_tag, level, monsterDrop);
-            } else {
-                dropId = sceneMonster.drop_id;
-            }
-        } else {
-            dropId = monster.getMonsterData().getKillDropId();
-        }
-        if (!dropTable.containsKey(dropId)) return false;
-        var dropData = dropTable.get(dropId);
-        List<GameItem> items = new ArrayList<>();
-        processDrop(dropData, 1, items);
-        if (dropData.isFallToGround()) {
-            dropItems(
-                    items, ActionReason.MonsterDie, monster, monster.getScene().getPlayers().get(0), true);
-        } else {
-            for (Player p : monster.getScene().getPlayers()) {
-                p.getInventory().addItems(items, ActionReason.MonsterDie);
-            }
-        }
-        return true;
-    }
+		int dropId;
+		int level = monster.getLevel();
+		SceneMonster sceneMonster = monster.getMetaMonster();
+
+		if (sceneMonster != null) {
+			if (sceneMonster.drop_tag != null) {
+				dropId = queryDropData(sceneMonster.drop_tag, level, monsterDrop);
+			} else {
+				dropId = sceneMonster.drop_id;
+			}
+		} else {
+			dropId = monster.getMonsterData().getKillDropId();
+		}
+
+		if (dropId <= 0) {
+			return false;
+		}
+
+		List<GameItem> items = new ArrayList<>();
+		boolean fallToGround;
+
+		var dropData = dropTable.get(dropId);
+		if (dropData != null) {
+			processDrop(dropData, 1, items);
+			fallToGround = dropData.isFallToGround();
+		} else {
+			var serverDropData = serverDropTable.get(dropId);
+			if (serverDropData == null) {
+				Grasscutter.getLogger()
+						.debug(
+								"No monster drop table found for drop_id = {}, monster_id = {}",
+								dropId,
+								monster.getMonsterData().getId());
+				return false;
+			}
+
+			processDrop(serverDropData, 1, items);
+			fallToGround = serverDropData.isFallToGround();
+		}
+
+		if (fallToGround) {
+			dropItems(items, ActionReason.MonsterDie, monster, monster.getScene().getPlayers().get(0), true);
+		} else {
+			for (Player p : monster.getScene().getPlayers()) {
+				p.getInventory().addItems(items, ActionReason.MonsterDie);
+			}
+		}
+		return true;
+	}
 
     public boolean handleChestDrop(int chestDropId, int dropCount, GameEntity bornFrom) {
         if (!dropTable.containsKey(chestDropId)) return false;
@@ -165,19 +191,7 @@ public final class DropSystem extends BaseGameSystem {
                     // win the item
                     int amount = calculateDropAmount(i) * count;
                     if (amount <= 0) break;
-                    if (dropTable.containsKey(id)) {
-                        processDrop(dropTable.get(id), amount, items);
-                    } else {
-                        boolean flag = true;
-                        for (var j : items) {
-                            if (j.getItemId() == id) {
-                                j.setCount(j.getCount() + amount);
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if (flag) items.add(new GameItem(id, amount));
-                    }
+                    addResolvedDrop(id, amount, items);
                     break;
                 }
             }
@@ -188,23 +202,60 @@ public final class DropSystem extends BaseGameSystem {
                 if (rand.nextInt(10000) < i.getWeight()) {
                     int amount = calculateDropAmount(i) * count;
                     if (amount <= 0) continue;
-                    if (dropTable.containsKey(id)) {
-                        processDrop(dropTable.get(id), amount, items);
-                    } else {
-                        boolean flag = true;
-                        for (var j : items) {
-                            if (j.getItemId() == id) {
-                                j.setCount(j.getCount() + amount);
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if (flag) items.add(new GameItem(id, amount));
-                    }
+                    addResolvedDrop(id, amount, items);
                 }
             }
         }
     }
+	
+	private void processDrop(DropTableExcelConfigData dropData, int count, List<GameItem> items) {
+		if (dropData == null || dropData.getDropVec() == null) {
+			return;
+		}
+
+		if (count > 1) {
+			for (int i = 0; i < count; i++) {
+				processDrop(dropData, 1, items);
+			}
+			return;
+		}
+
+		if (dropData.getRandomType() == 0) {
+			int weightSum = 0;
+			for (var i : dropData.getDropVec()) {
+				int id = i.getItemId();
+				if (id == 0) continue;
+				weightSum += i.getWeight();
+			}
+
+			if (weightSum == 0) return;
+
+			int weight = rand.nextInt(weightSum);
+			int sum = 0;
+
+			for (var i : dropData.getDropVec()) {
+				int id = i.getItemId();
+				if (id == 0) continue;
+
+				sum += i.getWeight();
+				if (weight < sum) {
+					int amount = calculateDropAmount(i.getCountRange()) * count;
+					addResolvedDrop(id, amount, items);
+					break;
+				}
+			}
+		} else if (dropData.getRandomType() == 1) {
+			for (var i : dropData.getDropVec()) {
+				int id = i.getItemId();
+				if (id == 0) continue;
+
+				if (rand.nextInt(10000) < i.getWeight()) {
+					int amount = calculateDropAmount(i.getCountRange()) * count;
+					addResolvedDrop(id, amount, items);
+				}
+			}
+		}
+	}
 
     private int calculateDropAmount(DropItemData i) {
         int amount;
@@ -220,6 +271,53 @@ public final class DropSystem extends BaseGameSystem {
         }
         return amount;
     }
+
+	private void addResolvedDrop(int id, int amount, List<GameItem> items) {
+		if (amount <= 0) {
+			return;
+		}
+
+		if (dropTable.containsKey(id)) {
+			processDrop(dropTable.get(id), amount, items);
+			return;
+		}
+
+		if (serverDropTable.containsKey(id)) {
+			processDrop(serverDropTable.get(id), amount, items);
+			return;
+		}
+
+		if (GameData.getItemDataMap().get(id) == null) {
+			Grasscutter.getLogger().debug("Skipping invalid drop item/subdrop id = {}", id);
+			return;
+		}
+
+		for (var item : items) {
+			if (item.getItemId() == id) {
+				item.setCount(item.getCount() + amount);
+				return;
+			}
+		}
+
+		items.add(new GameItem(id, amount));
+	}
+
+	private int calculateDropAmount(String countRange) {
+		int amount;
+
+		if (countRange.contains(";")) {
+			String[] ranges = countRange.split(";");
+			amount = rand.nextInt(Integer.parseInt(ranges[0]), Integer.parseInt(ranges[1]) + 1);
+		} else if (countRange.contains(".")) {
+			double expectAmount = Double.parseDouble(countRange);
+			amount = (int) expectAmount;
+			if (rand.nextDouble() < expectAmount - amount) amount++;
+		} else {
+			amount = Integer.parseInt(countRange);
+		}
+
+		return amount;
+	}
 
     /**
      * @param share Whether other players in the scene could see the drop items.

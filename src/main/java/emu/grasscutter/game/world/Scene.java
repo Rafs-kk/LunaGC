@@ -529,18 +529,37 @@ public class Scene {
         this.broadcastPacket(new PacketLifeStateChangeNotify(attackerId, target, LifeState.LIFE_DEAD));
 
         // Reward drop
-        var world = this.getWorld();
-        if (target instanceof EntityMonster monster && this.getSceneType() != SceneType.SCENE_DUNGEON) {
-            if (monster.getMetaMonster() != null
-                    && !world.getServer().getDropSystem().handleMonsterDrop(monster)) {
-                Grasscutter.getLogger()
-                        .debug(
-                                "Can not solve monster drop: drop_id = {}, drop_tag = {}. Falling back to legacy drop system.",
-                                monster.getMetaMonster().drop_id,
-                                monster.getMetaMonster().drop_tag);
-                world.getServer().getDropSystemLegacy().callDrop(monster);
-            }
-        }
+		var world = this.getWorld();
+		if (target instanceof EntityMonster monster && this.getSceneType() != SceneType.SCENE_DUNGEON) {
+			boolean handled = false;
+
+			if (monster.getMetaMonster() == null && monster.getSpawnEntry() != null) {
+				var legacyDrops = world.getServer().getDropSystemLegacy().getDropData();
+
+				if (legacyDrops.containsKey(monster.getMonsterData().getId())) {
+					world.getServer().getDropSystemLegacy().callDrop(monster);
+					handled = true;
+				}
+			}
+
+			if (!handled && !world.getServer().getDropSystem().handleMonsterDrop(monster)) {
+				if (monster.getMetaMonster() != null) {
+					Grasscutter.getLogger()
+							.debug(
+									"Can not solve monster drop: drop_id = {}, drop_tag = {}. Falling back to legacy drop system.",
+									monster.getMetaMonster().drop_id,
+									monster.getMetaMonster().drop_tag);
+				} else {
+					Grasscutter.getLogger()
+							.debug(
+									"Can not solve static monster drop: monster_id = {}, kill_drop_id = {}. Falling back to legacy drop system.",
+									monster.getMonsterData().getId(),
+									monster.getMonsterData().getKillDropId());
+				}
+
+				world.getServer().getDropSystemLegacy().callDrop(monster);
+			}
+		}
 		
 		if (target instanceof EntityGadget gadget
 				&& gadget.getContent() instanceof GadgetGatherObject gatherObject
