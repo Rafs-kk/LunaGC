@@ -31,6 +31,9 @@ Changes:
 * Disabled incomplete widget bootstrap packets during login until their 6.0.0 payloads are fully verified.
 * Adds a legacy/static spawn fallback for missing big-world script groups.
 * Restores natural mob spawns in Fontaine, Chenyu Vale, and Natlan when enableScriptInBigWorld is enabled.
+* Allows static/fallback overworld monsters to resolve drops after death.
+* Falls back to legacy monsterId-based drops when modern drop tables produce no items.
+* Restores breakable box/barrel behavior by only giving infinite HP to non-breakable gather objects.
 
 Tested:
 
@@ -61,6 +64,8 @@ Tested:
 * Confirmed companion-style gadgets are prevented from overwriting/corrupting the normal quick-use slot for now.
 * Confirmed enemies spawn naturally in Fontaine, Chenyu Vale, and Natlan with enableScriptInBigWorld: true.
 * Confirmed regional collectables, chests, and overworld gadgets still spawn in Fontaine, Chenyu Vale, and Natlan.
+* Confirmed basic mobs such as Hilichurls, Mitachurls, and Lawachurls drop loot in Fontaine, Chenyu Vale, and Natlan.
+* Confirmed basic mobs still drop loot in older regions.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
