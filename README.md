@@ -11,7 +11,7 @@ Changes:
 * Adds server-side drop handling for break-required gather objects, such as ores and mineral nodes.
 * Prevents break-required gather objects from being collected directly without breaking them first.
 * Adds simplified mining durability logic based on weapon type.
-* Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5 resources.
+* Updated Resources, replacing `ConfigAvatar_Lauma.json` with a working version from 6.5.0 resources.
 * Fixes Lauma's basic attacks not working correctly in-game.
 * Fixes character level-up and ascension requests not being handled in 6.0.0.
 * Updates avatar upgrade and promote request opcodes for the 6.0.0 client.
@@ -20,6 +20,17 @@ Changes:
 * Adds REL6.0-compatible handling for GadgetAutoPickDropInfoNotify.
 * Updates GadgetAutoPickDropInfoNotify opcode.
 * Manually encodes the reward item list using the 6.0-compatible item_list field number.
+* Fixes selectable item boxes from Gift Shop bundles returning "Internal server error".
+* Updates 6.0 `UseItemReq` handling for selectable bundles.
+* Reads the selected option from the 6.0.0 repeated selection field when present.
+* Normalizes the selected option index before resolving the reward item.
+* Fixes selector bounds checks for item IDs and item counts.
+* Fixed quick-use widget/gadget equipping for 6.0.0 by restoring SetWidgetSlotReq handling and manually encoding REL6.0-compatible SetWidgetSlotRsp, WidgetSlotChangeNotify, GetWidgetSlotRsp, and GetWidgetQuickSlotListRsp packets.
+* Corrected gadget classification so normal quick-use gadgets such as Kamera are no longer mistaken for companion/pet gadgets.
+* Added temporary quarantine for companion-style gadgets that require a separate attach-avatar/companion entity path, preventing them from corrupting the quick-use gadget slot.
+* Disabled incomplete widget bootstrap packets during login until their 6.0.0 payloads are fully verified.
+* Adds a legacy/static spawn fallback for missing big-world script groups.
+* Restores natural mob spawns in Fontaine, Chenyu Vale, and Natlan when enableScriptInBigWorld is enabled.
 
 Tested:
 
@@ -41,6 +52,15 @@ Tested:
 * Character stats update after level-up and ascension.
 * Domain rewards are still granted correctly after interacting with the reward tree/statue.
 * The "Obtained" reward screen appears after claiming domain rewards.
+* Share Bundles can redeem selected Talent Materials.
+* Selecting first, middle, and last options gives the correct item.
+* The consumed bundle count decreases correctly.
+* The chosen reward item appears on the Obtained screen.
+* Invalid end-of-list selection no longer causes "Internal server error".
+* Confirmed quick-use gadgets can be equipped, persists after relog, and can be used through the Z quick-use button.
+* Confirmed companion-style gadgets are prevented from overwriting/corrupting the normal quick-use slot for now.
+* Confirmed enemies spawn naturally in Fontaine, Chenyu Vale, and Natlan with enableScriptInBigWorld: true.
+* Confirmed regional collectables, chests, and overworld gadgets still spawn in Fontaine, Chenyu Vale, and Natlan.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
