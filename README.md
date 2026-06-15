@@ -34,6 +34,10 @@ Changes:
 * Allows static/fallback overworld monsters to resolve drops after death.
 * Falls back to legacy monsterId-based drops when modern drop tables produce no items.
 * Restores breakable box/barrel behavior by only giving infinite HP to non-breakable gather objects.
+* Adds missing drop entries for Fontaine, Chenyu Vale, Sumeru, and Natlan common/elite enemies.
+* Restores material drops for Fontemer Aberrants, Clockwork Meka, Breacher Primus, Fatui Operatives, Praetorian Golems, Xuanwen Beasts, late Sumeru enemies, Sumeru baseline enemies, and Natlan common/elite enemies.
+* Adjusts one Fluid Avatar of Lava spawn that was clipped inside terrain.
+* Adds extra Fluid Avatar of Lava static spawns for easier testing/farming.
 
 Tested:
 
@@ -66,6 +70,9 @@ Tested:
 * Confirmed regional collectables, chests, and overworld gadgets still spawn in Fontaine, Chenyu Vale, and Natlan.
 * Confirmed basic mobs such as Hilichurls, Mitachurls, and Lawachurls drop loot in Fontaine, Chenyu Vale, and Natlan.
 * Confirmed basic mobs still drop loot in older regions.
+* Confirmed Fontaine common/elite enemies drop their expected materials.
+* Confirmed Sumeru common/elite enemies drop their expected materials.
+* Confirmed Natlan common/elite enemies drop their expected materials.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
