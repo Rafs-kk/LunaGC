@@ -38,6 +38,9 @@ Changes:
 * Restores material drops for Fontemer Aberrants, Clockwork Meka, Breacher Primus, Fatui Operatives, Praetorian Golems, Xuanwen Beasts, late Sumeru enemies, Sumeru baseline enemies, and Natlan common/elite enemies.
 * Adjusts one Fluid Avatar of Lava spawn that was clipped inside terrain.
 * Adds extra Fluid Avatar of Lava static spawns for easier testing/farming.
+* Suppress false client monster kill-state invokes while monsters still have HP.
+* Reset affected monsters by replacing the broken entity at its born position.
+* Preserve normal server-side death/drop handling for real kills.
 
 Tested:
 
@@ -73,6 +76,10 @@ Tested:
 * Confirmed Fontaine common/elite enemies drop their expected materials.
 * Confirmed Sumeru common/elite enemies drop their expected materials.
 * Confirmed Natlan common/elite enemies drop their expected materials.
+* Aggroed overworld monsters and escaped their aggro range.
+* Monsters now reset back to their spawn position instead of dying.
+* Normal kills still drop loot.
+* Real deaths do not cause instant respawn/reset.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
