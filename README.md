@@ -41,6 +41,10 @@ Changes:
 * Suppress false client monster kill-state invokes while monsters still have HP.
 * Reset affected monsters by replacing the broken entity at its born position.
 * Preserve normal server-side death/drop handling for real kills.
+* Adds newer bosses materials as loot from the corresponding bosses.
+* Boosted the amount of Mora and EXP from restored bosses.
+* Adds elemental gemstone drops to restored overworld boss drop entries.
+* Uses matching gem families for each boss element.
 
 Tested:
 
@@ -80,6 +84,7 @@ Tested:
 * Monsters now reset back to their spawn position instead of dying.
 * Normal kills still drop loot.
 * Real deaths do not cause instant respawn/reset.
+* Overworld bosses now drop their materials and gemstone rewards properly.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
