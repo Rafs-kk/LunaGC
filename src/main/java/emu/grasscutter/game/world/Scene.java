@@ -350,6 +350,60 @@ public class Scene {
         getEntities().put(entity.getId(), entity);
         entity.onCreate(); // Call entity create event
     }
+	
+	public synchronized EntityMonster resetMonsterAtBornPosition(EntityMonster monster) {
+        if (monster == null || !this.getEntities().containsKey(monster.getId())) {
+            return null;
+        }
+
+        Position resetPos =
+                monster.getSpawnEntry() != null ? monster.getSpawnEntry().getPos() : monster.getBornPos();
+        Position resetRot =
+                monster.getSpawnEntry() != null ? monster.getSpawnEntry().getRot() : monster.getRotation();
+
+        EntityMonster replacement =
+                new EntityMonster(
+                        this,
+                        monster.getMonsterData(),
+                        resetPos,
+                        resetRot,
+                        monster.getLevel());
+
+        replacement.setGroupId(monster.getGroupId());
+        replacement.setConfigId(monster.getConfigId());
+        replacement.setBlockId(monster.getBlockId());
+        replacement.setCampId(monster.getCampId());
+        replacement.setCampType(monster.getCampType());
+        replacement.setPoseId(monster.getPoseId());
+        replacement.setAiId(monster.getAiId());
+        replacement.setOwnerEntityId(monster.getOwnerEntityId());
+        replacement.setSummonedTag(monster.getSummonedTag());
+        replacement.setSpawnEntry(monster.getSpawnEntry());
+        replacement.setMetaMonster(monster.getMetaMonster());
+        replacement.setEntityController(monster.getEntityController());
+
+        if (monster.getWeaponEntity() != null) {
+            this.getWeaponEntities().remove(monster.getWeaponEntity().getId());
+        }
+
+        // Remove the client-broken entity without treating it as a death, then spawn a fresh
+        // monster at its original/home position.
+        this.removeEntity(monster, VisionType.VISION_TYPE_REMOVE);
+        this.addEntities(List.of(replacement), VisionType.VISION_TYPE_BORN);
+
+        Grasscutter.getLogger()
+                .debug(
+                        "Reset false-dead/leashing monster at born position: oldEntityId={}, newEntityId={}, monsterId={}, oldPos={}, resetPos={}, groupId={}, configId={}",
+                        monster.getId(),
+                        replacement.getId(),
+                        monster.getMonsterData().getId(),
+                        monster.getPosition(),
+                        replacement.getPosition(),
+                        replacement.getGroupId(),
+                        replacement.getConfigId());
+
+        return replacement;
+    }
 
     public synchronized void addEntity(GameEntity entity) {
         this.addEntityDirectly(entity);
@@ -501,6 +555,9 @@ public class Scene {
     }
 
     public void killEntity(GameEntity target, int attackerId) {
+		
+		
+		
         GameEntity attacker = null;
 
         if (attackerId > 0) {
@@ -612,7 +669,7 @@ public class Scene {
         if (this.getScriptManager().isInit()) {
             // this.checkBlocks();
             this.checkGroups();
-			this.checkLegacySpawnsForMissingScriptGroups();
+            this.checkLegacySpawnsForMissingScriptGroups();
         } else {
             // TEMPORARY
             this.checkSpawns();
@@ -632,7 +689,9 @@ public class Scene {
                 (eid, e) -> {
                     if (!e.isAlive()) {
                         this.getEntities().remove(eid);
-                    } else e.onTick(sceneTime);
+                    } else {
+                        e.onTick(sceneTime);
+                    }
                 });
 
         blossomManager.onTick();

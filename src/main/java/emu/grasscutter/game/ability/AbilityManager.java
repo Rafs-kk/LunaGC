@@ -5,10 +5,12 @@ import emu.grasscutter.*;
 import emu.grasscutter.data.GameData;
 import emu.grasscutter.data.binout.*;
 import emu.grasscutter.data.binout.AbilityModifier.AbilityModifierAction;
-import emu.grasscutter.data.GameData;
 import emu.grasscutter.game.ability.actions.*;
 import emu.grasscutter.game.ability.mixins.*;
 import emu.grasscutter.game.avatar.Avatar;
+import emu.grasscutter.game.entity.EntityMonster;
+import emu.grasscutter.server.packet.send.PacketEntityFightPropUpdateNotify;
+import emu.grasscutter.server.packet.send.PacketLifeStateChangeNotify;
 
 import emu.grasscutter.net.proto.AbilityActionSummonOuterClass.AbilityActionSummon;
 import emu.grasscutter.net.proto.PropChangeDetailInfoOuterClass.PropChangeDetailInfo;
@@ -43,8 +45,6 @@ import emu.grasscutter.game.props.*;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import java.util.*;
 import java.util.concurrent.*;
-
-import javax.swing.text.html.parser.Entity;
 
 import lombok.Getter;
 
@@ -832,31 +832,60 @@ private void handleClearGlobalFloatValue(AbilityInvokeEntry invoke)
             
 
     private void handleKillState(AbilityInvokeEntry invoke) throws InvalidProtocolBufferException {
-        var scene = this.getPlayer().getScene();
-        var entity = scene.getEntityById(invoke.getEntityId());
-        if (entity == null) {
-            Grasscutter.getLogger()
-                    .trace("Entity of ID {} was not found in the scene.", invoke.getEntityId());
-            return;
-        }
+		var scene = this.getPlayer().getScene();
+		var entity = scene.getEntityById(invoke.getEntityId());
 
-        var killState = AbilityMetaSetKilledState.parseFrom(invoke.getAbilityData());
-        if (killState.getKilled()) {
-            scene.killEntity(entity);
-        } else if (!entity.isAlive()) {
-            if (entity instanceof EntityAvatar) {
-                // TODO Should EntityAvatar act on this invocation?
-                // It bugs revival due to resetting HP to max when
-                // the avatar should just stay dead.
-                Grasscutter.getLogger()
-                        .trace("Entity of ID {} is EntityAvatar. Ignoring", invoke.getEntityId());
-                return;
-            }
-            entity.setFightProperty(
-                    FightProperty.FIGHT_PROP_CUR_HP,
-                    entity.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP));
-        }
-    }
+		if (entity == null) {
+			Grasscutter.getLogger()
+					.trace("Entity of ID {} was not found in the scene.", invoke.getEntityId());
+			return;
+		}
+
+		var killState = AbilityMetaSetKilledState.parseFrom(invoke.getAbilityData());
+
+		if (killState.getKilled()) {
+			if (entity instanceof EntityMonster monster) {
+				float curHp = monster.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP);
+
+				if (curHp > 0f) {
+					EntityMonster replacement = scene.resetMonsterAtBornPosition(monster);
+
+					Grasscutter.getLogger()
+                            .debug(
+                                    "Blocked false monster kill-state and reset monster: oldEntityId={}, newEntityId={}, monsterId={}, hp={}, oldPos={}, bornPos={}",
+									monster.getId(),
+									replacement != null ? replacement.getId() : 0,
+									monster.getMonsterData().getId(),
+									curHp,
+									monster.getPosition(),
+									monster.getBornPos());
+
+					return;
+				}
+			}
+
+			scene.killEntity(entity);
+			return;
+		}
+
+		if (!entity.isAlive()) {
+			if (entity instanceof EntityAvatar) {
+				// TODO Should EntityAvatar act on this invocation?
+				// It bugs revival due to resetting HP to max when
+				// the avatar should just stay dead.
+				Grasscutter.getLogger()
+						.trace("Entity of ID {} is EntityAvatar. Ignoring", invoke.getEntityId());
+				return;
+			}
+
+			entity.setFightProperty(
+					FightProperty.FIGHT_PROP_CUR_HP,
+					entity.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP));
+			scene.broadcastPacket(new PacketLifeStateChangeNotify(entity, LifeState.LIFE_ALIVE));
+			scene.broadcastPacket(
+					new PacketEntityFightPropUpdateNotify(entity, FightProperty.FIGHT_PROP_CUR_HP));
+		}
+	}
 
     public void addAbilityToEntity(GameEntity entity, String name) {
         AbilityData data = GameData.getAbilityData(name);
