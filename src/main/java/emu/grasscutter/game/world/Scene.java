@@ -48,6 +48,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.*;
+import emu.grasscutter.game.props.ClimateType;
+import emu.grasscutter.game.props.EnterReason;
+import emu.grasscutter.net.proto.EnterTypeOuterClass;
+import emu.grasscutter.server.packet.send.PacketScenePlayerLocationNotify;
 
 public class Scene {
     @Getter private final World world;
@@ -77,6 +81,40 @@ public class Scene {
     @Getter private boolean finishedLoading = false;
     @Getter protected int tickCount = 0;
     @Getter private boolean isPaused = false;
+	private static final int ICEWIND_SCENE_ID = 3;
+	private static final int ICEWIND_GROUP_ID = 133402002;
+	private static final int ICEWIND_TALK_CONFIG_ID = 2004;
+	private static final int ICEWIND_PROP_CONFIG_ID = 2006;
+	private static final int ICEWIND_PROP_GADGET_ID = 70330531;
+	private static final int ICEWIND_BLOCK_ID = 334;
+	private static final Position ICEWIND_PROP_POS = new Position(3603.317f, 438.115f, 3814.537f);
+	private static final Position ICEWIND_PROP_ROT = new Position(0f, 221.7f, 0f);
+	private static final Set<Integer> ICEWIND_FALLBACK_MONSTER_IDS = Set.of(24070101, 24070102, 24070201, 24070202, 24070301);
+	
+	private static final int ICEWIND_FALLBACK_REFRESH_SECONDS = 24;
+	private static final int ICEWIND_FALLBACK_LOW_HP_REFRESH_SECONDS = 8;
+	private static final float ICEWIND_FALLBACK_CLIMAX_HP_RATIO = 0.715f;
+	
+	private static final int ICEWIND_WEATHER_ID = 5009;
+	private static final int ICEWIND_DEFAULT_WEATHER_ID = 0;
+
+	private static final Position ICEWIND_PLAYER_START_POS =
+			new Position(3588.0f, 438.2f, 3804.0f);
+
+	private static final Position ICEWIND_PLAYER_START_ROT =
+			new Position(0f, 45f, 0f);
+
+	private boolean icewindSuiteFallbackWeatherActive = false;
+	
+	private static final float ICEWIND_FALLBACK_SAFE_HP_RATIO = 0.80f;
+	private static final float ICEWIND_FALLBACK_MIN_DISPLAY_HP_RATIO = 0.78f;
+
+	private final Map<Integer, Float> icewindFallbackVirtualHp = new ConcurrentHashMap<>();
+	private final Map<Integer, Float> icewindFallbackVirtualMaxHp = new ConcurrentHashMap<>();
+	
+	private final Map<Integer, Long> pendingIcewindSuiteArenaTeleports = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> icewindFallbackSpawnTimes = new ConcurrentHashMap<>();
+	private final Map<Integer, Float> icewindFallbackLastHpRatios = new ConcurrentHashMap<>();
 
     private final List<Runnable> afterLoadedCallbacks = new ArrayList<>();
     private final List<Runnable> afterHostInitCallbacks = new ArrayList<>();
@@ -252,6 +290,9 @@ public class Scene {
     }
 
     public synchronized void removePlayer(Player player) {
+		if (this.getId() == ICEWIND_SCENE_ID && this.icewindSuiteFallbackWeatherActive) {
+			this.resetIcewindSuiteFallbackWeather(player);
+		}
         // Remove from challenge if leaving
         if (this.getChallenge() != null && this.getChallenge().inProgress()) {
             player.sendPacket(new PacketDungeonChallengeFinishNotify(this.getChallenge()));
@@ -545,7 +586,13 @@ public class Scene {
                 return;
             }
         }
-
+		
+		if (target instanceof EntityMonster monster && this.isIcewindFallbackMonster(monster)) {
+			if (this.handleIcewindSuiteVirtualDamage(monster, result.getDamage(), result.getAttackerId())) {
+				return;
+			}
+		}
+		
         // Sanity check
         target.damage(result.getDamage(), result.getAttackerId(), attackType);
     }
@@ -590,13 +637,13 @@ public class Scene {
 		if (target instanceof EntityMonster monster && this.getSceneType() != SceneType.SCENE_DUNGEON) {
 			boolean handled = false;
 
-			if (monster.getMetaMonster() == null && monster.getSpawnEntry() != null) {
-				var legacyDrops = world.getServer().getDropSystemLegacy().getDropData();
+			var legacyDrops = world.getServer().getDropSystemLegacy().getDropData();
 
-				if (legacyDrops.containsKey(monster.getMonsterData().getId())) {
-					world.getServer().getDropSystemLegacy().callDrop(monster);
-					handled = true;
-				}
+			if (monster.getMetaMonster() == null
+					&& (monster.getSpawnEntry() != null || this.isIcewindFallbackMonster(monster))
+					&& legacyDrops.containsKey(monster.getMonsterData().getId())) {
+				world.getServer().getDropSystemLegacy().callDrop(monster);
+				handled = true;
 			}
 
 			if (!handled && !world.getServer().getDropSystem().handleMonsterDrop(monster)) {
@@ -704,6 +751,12 @@ public class Scene {
         }
 
         this.checkNpcGroup();
+		this.processPendingIcewindSuiteArenaTeleports();
+		
+		if (this.tickCount % 20 == 0) {
+			this.checkIcewindSuiteFallbackAntiStall(sceneTime);
+			this.checkIcewindSuiteFallbackReset();
+		}
 
         this.finishLoading();
         this.checkPlayerRespawn();
@@ -1526,4 +1579,478 @@ public class Scene {
     public void saveGroups() {
         this.getScriptManager().getCachedGroupInstances().values().forEach(SceneGroupInstance::save);
     }
+
+	public void hideIcewindSuitePresenceProp() {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		var prop = this.getEntityByConfigId(ICEWIND_PROP_CONFIG_ID, ICEWIND_GROUP_ID);
+
+		if (prop != null) {
+			this.removeEntity(prop, VisionType.VISION_TYPE_REMOVE);
+
+			Grasscutter.getLogger()
+					.debug(
+							"[IcewindSuiteFallback] Hid Icewind Suite presence prop: entityId={}, configId={}, groupId={}",
+							prop.getId(),
+							prop.getConfigId(),
+							prop.getGroupId());
+		}
+	}
+
+	private void restoreIcewindSuitePresencePropIfMissing() {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		if (this.getEntityByConfigId(ICEWIND_PROP_CONFIG_ID, ICEWIND_GROUP_ID) != null) {
+			return;
+		}
+
+		EntityGadget prop =
+				new EntityGadget(
+						this,
+						ICEWIND_PROP_GADGET_ID,
+						ICEWIND_PROP_POS.clone(),
+						ICEWIND_PROP_ROT.clone());
+
+		prop.setGroupId(ICEWIND_GROUP_ID);
+		prop.setBlockId(ICEWIND_BLOCK_ID);
+		prop.setConfigId(ICEWIND_PROP_CONFIG_ID);
+		prop.setState(0);
+
+		this.addEntity(prop);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[IcewindSuiteFallback] Restored Icewind Suite presence prop: entityId={}, configId={}, groupId={}",
+						prop.getId(),
+						prop.getConfigId(),
+						prop.getGroupId());
+	}
+
+	private void checkIcewindSuiteFallbackReset() {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		boolean hasIcewindBoss =
+				this.getEntities().values().stream()
+						.filter(e -> e instanceof EntityMonster)
+						.map(e -> (EntityMonster) e)
+						.anyMatch(m -> ICEWIND_FALLBACK_MONSTER_IDS.contains(m.getMonsterData().getId()));
+
+		boolean propMissing =
+				this.getEntityByConfigId(ICEWIND_PROP_CONFIG_ID, ICEWIND_GROUP_ID) == null;
+
+		if (!hasIcewindBoss && !propMissing) {
+			return;
+		}
+
+		boolean playerNearArena =
+				this.getPlayers().stream()
+						.anyMatch(p -> p.getPosition().computeDistance(ICEWIND_PROP_POS) <= 120.0);
+
+		// Do not reset while the player is still near the arena.
+		if (playerNearArena) {
+			return;
+		}
+
+		if (hasIcewindBoss) {
+			List<GameEntity> icewindBosses =
+					this.getEntities().values().stream()
+							.filter(e -> e instanceof EntityMonster)
+							.filter(
+									e ->
+											ICEWIND_FALLBACK_MONSTER_IDS.contains(
+													((EntityMonster) e).getMonsterData().getId()))
+							.toList();
+
+			this.removeEntities(icewindBosses, VisionType.VISION_TYPE_REMOVE);
+
+			Grasscutter.getLogger()
+					.debug(
+							"[IcewindSuiteFallback] Removed active Icewind fallback boss after player left arena.");
+		}
+
+		var talkEntity = this.getEntityByConfigId(ICEWIND_TALK_CONFIG_ID, ICEWIND_GROUP_ID);
+
+		if (talkEntity instanceof EntityGadget talkGadget && talkGadget.getState() != 0) {
+			talkGadget.updateState(0);
+		}
+		
+		this.icewindFallbackVirtualHp.clear();
+		this.icewindFallbackVirtualMaxHp.clear();
+		this.icewindFallbackSpawnTimes.clear();
+		this.icewindFallbackLastHpRatios.clear();
+		
+		this.restoreIcewindSuitePresencePropIfMissing();
+		this.resetIcewindSuiteFallbackWeather();
+		this.restoreIcewindSuitePresencePropIfMissing();
+	}
+	
+	private boolean isIcewindFallbackMonster(EntityMonster monster) {
+		return this.getId() == ICEWIND_SCENE_ID
+				&& monster.getGroupId() == ICEWIND_GROUP_ID
+				&& ICEWIND_FALLBACK_MONSTER_IDS.contains(monster.getMonsterData().getId());
+	}
+
+	private float getIcewindHpRatio(EntityMonster monster) {
+		float curHp = monster.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP);
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+
+		if (maxHp <= 0f) {
+			return 1f;
+		}
+
+		return curHp / maxHp;
+	}
+	
+	public void registerIcewindSuiteFallbackBoss(EntityMonster monster) {
+		if (monster == null || !this.isIcewindFallbackMonster(monster)) {
+			return;
+		}
+
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+
+		this.icewindFallbackSpawnTimes.put(monster.getId(), this.getSceneTimeSeconds());
+		this.icewindFallbackLastHpRatios.put(monster.getId(), this.getIcewindHpRatio(monster));
+
+		this.icewindFallbackVirtualMaxHp.putIfAbsent(monster.getId(), maxHp);
+		this.icewindFallbackVirtualHp.putIfAbsent(monster.getId(), maxHp);
+
+		this.setIcewindFallbackDisplayedHp(monster);
+	}
+
+	private void checkIcewindSuiteFallbackAntiStall(int sceneTime) {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		var icewindBosses =
+				this.getEntities().values().stream()
+						.filter(e -> e instanceof EntityMonster)
+						.map(e -> (EntityMonster) e)
+						.filter(this::isIcewindFallbackMonster)
+						.toList();
+
+		if (icewindBosses.isEmpty()) {
+			this.icewindFallbackVirtualHp.clear();
+			this.icewindFallbackVirtualMaxHp.clear();
+			this.icewindFallbackSpawnTimes.clear();
+			this.icewindFallbackLastHpRatios.clear();
+			return;
+		}
+
+		for (EntityMonster monster : icewindBosses) {
+			if (!monster.isAlive()) {
+				continue;
+			}
+
+			int bornTime =
+					this.icewindFallbackSpawnTimes.computeIfAbsent(
+							monster.getId(), id -> sceneTime);
+
+			float currentRatio = this.getIcewindHpRatio(monster);
+			float previousRatio =
+					this.icewindFallbackLastHpRatios.getOrDefault(monster.getId(), currentRatio);
+
+			boolean inClimaxHpZone = currentRatio <= ICEWIND_FALLBACK_CLIMAX_HP_RATIO;
+
+			int refreshSeconds =
+					inClimaxHpZone
+							? ICEWIND_FALLBACK_LOW_HP_REFRESH_SECONDS
+							: ICEWIND_FALLBACK_REFRESH_SECONDS;
+
+			boolean timedRefresh = sceneTime - bornTime >= refreshSeconds;
+
+			boolean crossedClimaxHpThreshold =
+					previousRatio > ICEWIND_FALLBACK_CLIMAX_HP_RATIO
+							&& currentRatio <= ICEWIND_FALLBACK_CLIMAX_HP_RATIO;
+
+			this.icewindFallbackLastHpRatios.put(monster.getId(), currentRatio);
+
+			if (timedRefresh || crossedClimaxHpThreshold) {
+				this.refreshIcewindSuiteFallbackBoss(
+						monster,
+						sceneTime,
+						timedRefresh
+								? (inClimaxHpZone ? "low-hp-timer" : "timer")
+								: "hp-threshold");
+				return;
+			}
+		}
+
+		var liveIds = icewindBosses.stream().map(EntityMonster::getId).collect(Collectors.toSet());
+		this.icewindFallbackSpawnTimes.keySet().removeIf(id -> !liveIds.contains(id));
+		this.icewindFallbackLastHpRatios.keySet().removeIf(id -> !liveIds.contains(id));
+		this.icewindFallbackVirtualHp.keySet().removeIf(id -> !liveIds.contains(id));
+		this.icewindFallbackVirtualMaxHp.keySet().removeIf(id -> !liveIds.contains(id));
+	}
+	
+	private void refreshIcewindSuiteFallbackBoss(EntityMonster oldMonster, int sceneTime, String reason) {
+		if (oldMonster == null || !oldMonster.isAlive()) {
+			return;
+		}
+
+		int monsterId = oldMonster.getMonsterData().getId();
+
+		var monsterData = GameData.getMonsterDataMap().get(monsterId);
+		if (monsterData == null) {
+			Grasscutter.getLogger()
+					.warn("[IcewindSuiteFallback] Cannot refresh boss; missing monsterData for monsterId={}", monsterId);
+			return;
+		}
+
+		float oldCurHp = oldMonster.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP);
+
+		if (oldCurHp <= 0f) {
+			return;
+		}
+
+		float oldMaxHp = oldMonster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		float virtualHp = this.icewindFallbackVirtualHp.getOrDefault(oldMonster.getId(), oldMaxHp);
+		float virtualMaxHp = this.icewindFallbackVirtualMaxHp.getOrDefault(oldMonster.getId(), oldMaxHp);
+
+		Position pos = oldMonster.getBornPos().clone();
+		Position rot = oldMonster.getRotation().clone();
+
+		EntityMonster replacement =
+				new EntityMonster(
+						this,
+						monsterData,
+						pos,
+						rot,
+						oldMonster.getLevel());
+
+		replacement.setGroupId(oldMonster.getGroupId());
+		replacement.setBlockId(oldMonster.getBlockId());
+		replacement.setConfigId(oldMonster.getConfigId());
+		replacement.setCampId(oldMonster.getCampId());
+		replacement.setCampType(oldMonster.getCampType());
+		replacement.setPoseId(oldMonster.getPoseId());
+		replacement.setAiId(oldMonster.getAiId());
+		replacement.setOwnerEntityId(oldMonster.getOwnerEntityId());
+		replacement.setSummonedTag(oldMonster.getSummonedTag());
+
+		float replacementMaxHp = replacement.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+
+		this.icewindFallbackVirtualHp.remove(oldMonster.getId());
+		this.icewindFallbackVirtualMaxHp.remove(oldMonster.getId());
+		this.icewindFallbackSpawnTimes.remove(oldMonster.getId());
+		this.icewindFallbackLastHpRatios.remove(oldMonster.getId());
+
+		this.icewindFallbackVirtualHp.put(replacement.getId(), Math.min(virtualHp, virtualMaxHp));
+		this.icewindFallbackVirtualMaxHp.put(replacement.getId(), virtualMaxHp);
+
+		replacement.setFightProperty(
+				FightProperty.FIGHT_PROP_CUR_HP,
+				replacementMaxHp * ICEWIND_FALLBACK_SAFE_HP_RATIO);
+				
+		this.removeEntity(oldMonster, VisionType.VISION_TYPE_REMOVE);
+		this.addEntities(List.of(replacement), VisionType.VISION_TYPE_BORN);
+
+		this.registerIcewindSuiteFallbackBoss(replacement);
+		this.setIcewindFallbackDisplayedHp(replacement);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[IcewindSuiteFallback] Refreshed boss to avoid broken Climax: reason={}, oldEntityId={}, newEntityId={}, monsterId={}, virtualHp={}/{}, actualHp={}, pos={}",
+						reason,
+						oldMonster.getId(),
+						replacement.getId(),
+						monsterId,
+						virtualHp,
+						virtualMaxHp,
+						replacement.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP),
+						pos);
+	}
+	
+	public void activateIcewindSuiteFallbackWeather() {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			player.setWeather(ICEWIND_WEATHER_ID, ClimateType.CLIMATE_SUNNY);
+		}
+
+		this.icewindSuiteFallbackWeatherActive = true;
+
+		Grasscutter.getLogger()
+				.debug("[IcewindSuiteFallback] Set arena weather to {}", ICEWIND_WEATHER_ID);
+	}
+
+	public void resetIcewindSuiteFallbackWeather() {
+		if (this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		if (!this.icewindSuiteFallbackWeatherActive) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			this.resetIcewindSuiteFallbackWeather(player);
+		}
+		
+		this.icewindSuiteFallbackWeatherActive = false;
+	}
+
+	private void resetIcewindSuiteFallbackWeather(Player player) {
+		if (player == null) {
+			return;
+		}
+
+		player.setWeather(ICEWIND_DEFAULT_WEATHER_ID, ClimateType.CLIMATE_SUNNY);
+	}
+
+	public void teleportPlayerToIcewindSuiteArena(Player player) {
+		if (player == null || player.getWorld() == null || player.getScene() != this) {
+			return;
+		}
+
+		var teleportProps =
+				TeleportProperties.builder()
+						.sceneId(this.getId())
+						.teleportType(PlayerTeleportEvent.TeleportType.COMMAND)
+						.enterReason(EnterReason.Gm)
+						.enterType(EnterTypeOuterClass.EnterType.ENTER_TYPE_GOTO)
+						.teleportTo(ICEWIND_PLAYER_START_POS.clone())
+						.teleportRot(ICEWIND_PLAYER_START_ROT.clone())
+						.build();
+
+		if (player.getWorld().transferPlayerToScene(player, teleportProps)) {
+			player.sendPacket(new PacketScenePlayerLocationNotify(this));
+
+			Grasscutter.getLogger()
+					.debug(
+							"[IcewindSuiteFallback] Teleported player {} near Icewind Suite arena: pos={}",
+							player.getUid(),
+							ICEWIND_PLAYER_START_POS);
+		}
+	}
+	
+	public void queueIcewindSuiteArenaTeleport(Player player, long delayMs) {
+		if (player == null || player.getScene() != this || this.getId() != ICEWIND_SCENE_ID) {
+			return;
+		}
+
+		this.pendingIcewindSuiteArenaTeleports.put(
+				player.getUid(),
+				System.currentTimeMillis() + delayMs);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[IcewindSuiteFallback] Queued delayed arena teleport for player {} in {}ms",
+						player.getUid(),
+						delayMs);
+	}
+
+	private void processPendingIcewindSuiteArenaTeleports() {
+		if (this.getId() != ICEWIND_SCENE_ID || this.pendingIcewindSuiteArenaTeleports.isEmpty()) {
+			return;
+		}
+
+		long now = System.currentTimeMillis();
+
+		var iterator = this.pendingIcewindSuiteArenaTeleports.entrySet().iterator();
+
+		while (iterator.hasNext()) {
+			var entry = iterator.next();
+
+			if (entry.getValue() > now) {
+				continue;
+			}
+
+			iterator.remove();
+
+			Player targetPlayer =
+					this.getPlayers().stream()
+							.filter(p -> p.getUid() == entry.getKey())
+							.findFirst()
+							.orElse(null);
+
+			if (targetPlayer == null || targetPlayer.getScene() != this) {
+				continue;
+			}
+
+			this.teleportPlayerToIcewindSuiteArena(targetPlayer);
+		}
+	}
+	
+	private void setIcewindFallbackDisplayedHp(EntityMonster monster) {
+		if (monster == null || !this.isIcewindFallbackMonster(monster)) {
+			return;
+		}
+
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		float virtualMaxHp = this.icewindFallbackVirtualMaxHp.getOrDefault(monster.getId(), maxHp);
+		float virtualHp = this.icewindFallbackVirtualHp.getOrDefault(monster.getId(), virtualMaxHp);
+
+		if (maxHp <= 0f || virtualMaxHp <= 0f) {
+			return;
+		}
+
+		float virtualRatio = Math.max(0f, Math.min(1f, virtualHp / virtualMaxHp));
+
+		// Keep the actual monster HP above the broken Climax threshold.
+		// The visible HP bar will move between 100% and ~78%, then the boss dies when virtual HP reaches 0.
+		float displayRatio =
+				ICEWIND_FALLBACK_MIN_DISPLAY_HP_RATIO
+						+ ((1f - ICEWIND_FALLBACK_MIN_DISPLAY_HP_RATIO) * virtualRatio);
+
+		displayRatio = Math.max(ICEWIND_FALLBACK_MIN_DISPLAY_HP_RATIO, displayRatio);
+
+		monster.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, maxHp * displayRatio);
+		this.broadcastPacket(new PacketEntityFightPropUpdateNotify(monster, FightProperty.FIGHT_PROP_CUR_HP));
+	}
+
+	private boolean handleIcewindSuiteVirtualDamage(
+			EntityMonster monster, float amount, int attackerId) {
+		if (monster == null || !this.isIcewindFallbackMonster(monster)) {
+			return false;
+		}
+
+		if (amount <= 0f || !monster.isAlive()) {
+			return true;
+		}
+
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		float virtualMaxHp = this.icewindFallbackVirtualMaxHp.getOrDefault(monster.getId(), maxHp);
+		float virtualHp = this.icewindFallbackVirtualHp.getOrDefault(monster.getId(), virtualMaxHp);
+
+		virtualHp = Math.max(0f, virtualHp - amount);
+
+		this.icewindFallbackVirtualMaxHp.put(monster.getId(), virtualMaxHp);
+		this.icewindFallbackVirtualHp.put(monster.getId(), virtualHp);
+
+		if (virtualHp <= 0f) {
+			monster.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, 0f);
+			this.broadcastPacket(new PacketEntityFightPropUpdateNotify(monster, FightProperty.FIGHT_PROP_CUR_HP));
+
+			this.icewindFallbackVirtualHp.remove(monster.getId());
+			this.icewindFallbackVirtualMaxHp.remove(monster.getId());
+			this.icewindFallbackSpawnTimes.remove(monster.getId());
+			this.icewindFallbackLastHpRatios.remove(monster.getId());
+
+			this.killEntity(monster, attackerId);
+			return true;
+		}
+
+		this.setIcewindFallbackDisplayedHp(monster);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[IcewindSuiteFallback] Virtual damage: entityId={}, monsterId={}, damage={}, virtualHp={}/{}, actualHp={}",
+						monster.getId(),
+						monster.getMonsterData().getId(),
+						amount,
+						virtualHp,
+						virtualMaxHp,
+						monster.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP));
+
+		return true;
+	}
 }

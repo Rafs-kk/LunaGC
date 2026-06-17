@@ -2,6 +2,7 @@ package emu.grasscutter.game.entity;
 
 import static emu.grasscutter.scripts.constants.EventType.EVENT_SPECIFIC_MONSTER_HP_CHANGE;
 
+import emu.grasscutter.Grasscutter;
 import emu.grasscutter.data.GameData;
 import emu.grasscutter.data.binout.config.ConfigEntityMonster;
 import emu.grasscutter.data.common.PropGrowCurve;
@@ -58,11 +59,32 @@ public class EntityMonster extends GameEntity {
 
     @Getter private List<Player> playerOnBattle;
     @Nullable @Getter @Setter private SceneMonster metaMonster;
+	
+	@Getter @Setter private boolean suppressIcewindSuiteCombatAffixes = false;
+
+	private static final Set<Integer> ICEWIND_SUITE_MONSTER_IDS = Set.of(24070101, 24070102, 24070201, 24070202, 24070301);
+
+	private static final Set<Integer> ICEWIND_SUITE_COMBAT_AFFIXES = Set.of(40611, 40612);
 
     public EntityMonster(
-            Scene scene, MonsterData monsterData, Position pos, Position rot, int level) {
+			Scene scene,
+			MonsterData monsterData,
+			Position pos,
+			Position rot,
+			int level) {
+		this(scene, monsterData, pos, rot, level, false);
+	}
+
+	public EntityMonster(
+			Scene scene,
+			MonsterData monsterData,
+			Position pos,
+			Position rot,
+			int level,
+			boolean suppressIcewindSuiteCombatAffixes) {
         super(scene);
 
+		this.suppressIcewindSuiteCombatAffixes = suppressIcewindSuiteCombatAffixes;
         this.id = this.getWorld().getNextEntityId(EntityIdType.MONSTER);
         this.monsterData = monsterData;
         this.fightProperties = new Int2FloatOpenHashMap();
@@ -117,19 +139,35 @@ public class EntityMonster extends GameEntity {
         // Affix abilities
         var optionalGroup =
                 this.getScene().getLoadedGroups().stream().filter(g -> g.id == this.getGroupId()).findAny();
-        List<Integer> affixes = null;
-        if (optionalGroup.isPresent()) {
-            var group = optionalGroup.get();
+        
+		List<Integer> affixes = null;
+		if (optionalGroup.isPresent()) {
+			var group = optionalGroup.get();
+			var monster = group.monsters.get(getConfigId());
 
-            var monster = group.monsters.get(getConfigId());
-            if (monster != null) affixes = monster.affix;
-        }
+			if (monster != null && monster.affix != null) {
+				affixes = new ArrayList<>(monster.affix);
+			}
+		}
 
-        if (monsterData != null) {
-            // TODO: Research if group affixes goes first
-            if (affixes == null) affixes = monsterData.getAffix();
-            else affixes.addAll(monsterData.getAffix());
-        }
+		if (monsterData != null && monsterData.getAffix() != null) {
+			if (affixes == null) {
+				affixes = new ArrayList<>(monsterData.getAffix());
+			} else {
+				affixes.addAll(monsterData.getAffix());
+			}
+		}
+
+		if (this.suppressIcewindSuiteCombatAffixes
+				&& ICEWIND_SUITE_MONSTER_IDS.contains(this.getMonsterId())
+				&& affixes != null) {
+			affixes.removeIf(ICEWIND_SUITE_COMBAT_AFFIXES::contains);
+			Grasscutter.getLogger()
+					.warn(
+							"[IcewindSuiteFallback] Suppressed Icewind CombatType affixes before ability init: monsterId={}, remainingAffixes={}",
+							this.getMonsterId(),
+							affixes);
+		}
 
         if (affixes != null) {
             for (var affixId : affixes) {
@@ -407,6 +445,23 @@ public class EntityMonster extends GameEntity {
                 FightProperty.FIGHT_PROP_CUR_HP,
                 this.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP) * hpPercent);
     }
+	
+	private List<Integer> getMonsterAffixesForProto() {
+		List<Integer> affixes = new ArrayList<>(this.getMonsterData().getAffix());
+
+		// Icewind Suite fallback:
+		// 40611 / 40612 are the special Nutcracker CombatType affixes.
+		// In the restored fallback fight, the missing Lua/challenge logic makes the boss enter Climax and then stall in the center of the arena.
+		// Keep 40603 / 40604, but suppress the broken combat-type affix.
+		if (this.getScene().getId() == 3
+				&& this.getGroupId() == 133402002
+				&& Set.of(24070101, 24070102, 24070201, 24070202, 24070301)
+						.contains(this.getMonsterData().getId())) {
+			affixes.removeIf(affix -> affix == 40611 || affix == 40612);
+		}
+
+		return affixes;
+	}
 
     @Override
     public SceneEntityInfo toProto() {
@@ -449,7 +504,7 @@ public class EntityMonster extends GameEntity {
                         .setMonsterId(getMonsterId())
                         .setGroupId(this.getGroupId())
                         .setConfigId(this.getConfigId())
-                        .addAllAffixList(data.getAffix())
+                        .addAllAffixList(this.getMonsterAffixesForProto())
                         .setAuthorityPeerId(this.getWorld().getHostPeerId())
                         .setPoseId(this.getPoseId())
                         .setBlockId(this.getScene().getId())
