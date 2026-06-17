@@ -45,6 +45,16 @@ Changes:
 * Boosted the amount of Mora and EXP from restored bosses.
 * Adds elemental gemstone drops to restored overworld boss drop entries.
 * Uses matching gem families for each boss element.
+* Adds a fallback start path for Icewind Suite via Maillardet's talk gadget.
+* Handles empty talk NPC validation for scripted gadget-based talks.
+* Applies TALK_EXEC_SET_GADGET_STATE for Maillardet's boss selection.
+* Spawns the selected Icewind Suite variant when the original Lua group has no start trigger.
+* Hides/restores the decorative Icewind Suite prop.
+* Applies and resets Fontaine boss weather around the fallback fight.
+* Adds delayed arena teleport after Maillardet dialogue.
+* Adds virtual HP handling to Icewind Suite to avoid the unsupported Climax phase.
+* Preserves boss drops for fallback-spawned Icewind Suite monsters.
+* Updates Drop.json with tested boss artifact/prayer/gem drops.
 
 Tested:
 
@@ -85,6 +95,10 @@ Tested:
 * Normal kills still drop loot.
 * Real deaths do not cause instant respawn/reset.
 * Overworld bosses now drop their materials and gemstone rewards properly.
+* Maillardet options now start Dirge of Coppelia and Nemesis of Coppelius.
+* Boss prop disappears during the fight and returns after leaving the area.
+* Weather changes during the fight and resets after leaving.
+* Boss HP/drops work through the fallback fight.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
