@@ -1,4 +1,4 @@
-List of changes:
+# List of changes:
 
 * Restores the TrifleGadget item payload for dropped items.
 * Fixes enemy drops being stuck in midair and unable to be picked up.
@@ -53,7 +53,7 @@ List of changes:
 * Updates Drop.json with tested boss artifact/prayer/gem drops.
 * Restores Setekh Wenut's missing on-defeat boss reward logic by adding the Trounce Blossom gadget and wiring the ANY_MONSTER_DIE trigger to create it after the boss is defeated.
 
-Tested:
+# Tested:
 
 * Enemy drops can be picked up normally.
 * Mora and Primogem drops are collected correctly.
@@ -98,7 +98,7 @@ Tested:
 * Boss HP/drops work through the fallback fight.
 * Setekh Wenut now spawns its Trounce Blossom after defeat and gives proper boss rewards through a resource script fix.
 
-Notes:
+# Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 * The 6.0 client sends some avatar upgrade/promote request data through fields not mapped by the current generated proto classes, so the handlers include compatibility decoding for those fields.
 * The current domain fix manually encodes the packet payload instead of regenerating all proto classes, because the existing generated 6.0.0 proto mapping does not match the client’s expected field layout for this packet.
