@@ -55,6 +55,7 @@ Changes:
 * Adds virtual HP handling to Icewind Suite to avoid the unsupported Climax phase.
 * Preserves boss drops for fallback-spawned Icewind Suite monsters.
 * Updates Drop.json with tested boss artifact/prayer/gem drops.
+* Restores Setekh Wenut's missing on-defeat boss reward logic by adding the Trounce Blossom gadget and wiring the ANY_MONSTER_DIE trigger to create it after the boss is defeated.
 
 Tested:
 
@@ -99,6 +100,7 @@ Tested:
 * Boss prop disappears during the fight and returns after leaving the area.
 * Weather changes during the fight and resets after leaving.
 * Boss HP/drops work through the fallback fight.
+* Setekh Wenut now spawns its Trounce Blossom after defeat and gives proper boss rewards through a resource script fix.
 
 Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
