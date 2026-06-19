@@ -95,8 +95,8 @@ public class WorldDataSystem extends BaseGameSystem {
 
         var groupId = imd.getGroupIdList().get(0);
         var monsterId = imd.getMonsterIdList().get(0);
-        var sceneId = imd.getCityData().getSceneId();
-        var group = getInvestigationGroup(sceneId, groupId);
+        var sceneId = getInvestigationMonsterSceneId(imd);
+		var group = getInvestigationGroup(sceneId, groupId);
 
         if (group == null || group.monsters == null) {
             return null;
@@ -113,7 +113,7 @@ public class WorldDataSystem extends BaseGameSystem {
         builder
                 .setId(imd.getId())
                 .setCityId(imd.getCityId())
-                .setSceneId(imd.getCityData().getSceneId())
+                .setSceneId(sceneId)
                 .setGroupId(groupId)
                 .setMonsterId(monsterId)
                 .setLevel(getMonsterLevel(monster.get(), player.getWorld()))
@@ -146,4 +146,142 @@ public class WorldDataSystem extends BaseGameSystem {
                 .filter(Objects::nonNull)
                 .toList();
     }
+
+	public List<InvestigationMonsterOuterClass.InvestigationMonster>
+			getInvestigationMonsterMapMarkersByCityId(Player player, int cityId) {
+		var cityData = GameData.getCityDataMap().get(cityId);
+		if (cityData == null) {
+			Grasscutter.getLogger().warn("City not exist {}", cityId);
+			return List.of();
+		}
+
+		return GameData.getInvestigationMonsterDataMap().values().stream()
+				.filter(imd -> imd.getCityId() == cityId)
+				.filter(InvestigationMonsterData::isMapMarkable)
+				.filter(imd -> "Boss".equals(imd.getMonsterCategory()))
+				.map(imd -> this.getInvestigationMonsterMapMarker(player, imd))
+				.filter(Objects::nonNull)
+				.toList();
+	}
+
+	private InvestigationMonsterOuterClass.InvestigationMonster getInvestigationMonsterMapMarker(
+			Player player, InvestigationMonsterData imd) {
+		if (imd.getGroupIdList() == null
+				|| imd.getGroupIdList().isEmpty()
+				|| imd.getMonsterIdList() == null
+				|| imd.getMonsterIdList().isEmpty()
+				|| !imd.hasMapMarkerPosition()) {
+			return null;
+		}
+
+		int groupId = imd.getGroupIdList().get(0);
+		int monsterId = imd.getMonsterIdList().get(0);
+
+		int sceneId = getInvestigationMonsterSceneId(imd);
+
+		var markerPos = getInvestigationMonsterMarkerPosition(imd, sceneId, groupId, monsterId);
+		if (markerPos == null) {
+			return null;
+		}
+
+		int resin = imd.getPODEFGMCJAD();
+		if (resin <= 0 && "Boss".equals(imd.getMonsterCategory())) {
+			resin = 40;
+		}
+
+		var builder =
+				InvestigationMonsterOuterClass.InvestigationMonster.newBuilder()
+						.setId(imd.getId())
+						.setCityId(imd.getCityId())
+						.setSceneId(sceneId)
+						.setGroupId(groupId)
+						.setMonsterId(monsterId)
+						.setLevel(getDefaultInvestigationMonsterLevel(player))
+						.setIsAlive(true)
+						.setNextRefreshTime(0)
+						.setRefreshInterval(180)
+						.setPos(markerPos.toProto())
+						.setLockState(
+								InvestigationMonsterOuterClass.InvestigationMonster.LockState
+										.LOCK_STATE_NONE);
+
+		if (resin > 0) {
+			builder.setResin(resin);
+			builder.setBossChestNum(0);
+			builder.setMaxBossChestNum(1);
+			builder.setNextBossChestRefreshTime(0);
+		}
+		return builder.build();
+	}
+
+	private int getDefaultInvestigationMonsterLevel(Player player) {
+		var worldLevelData = GameData.getWorldLevelDataMap().get(player.getWorld().getWorldLevel());
+		if (worldLevelData != null) {
+			return Math.max(1, worldLevelData.getMonsterLevel());
+		}
+
+		return 1;
+	}
+
+	private int getInvestigationMonsterSceneId(InvestigationMonsterData imd) {
+		if (imd == null) {
+			return 3;
+		}
+
+		if (imd.getCityData() != null && imd.getCityData().getSceneId() > 0) {
+			return imd.getCityData().getSceneId();
+		}
+
+		if (imd.getGroupIdList() != null && !imd.getGroupIdList().isEmpty()) {
+			int groupId = imd.getGroupIdList().get(0);
+
+			// Examples:
+			// scene3 groups: 133xxxxxx -> 13 - 10 = 3
+			// scene5 groups: 155xxxxxx -> 15 - 10 = 5
+			// scene6 groups: 166xxxxxx -> 16 - 10 = 6
+			int prefix = groupId / 10000000;
+			int derivedSceneId = prefix - 10;
+
+			if (derivedSceneId > 0 && derivedSceneId < 1000) {
+				return derivedSceneId;
+			}
+		}
+
+		// Most InvestigationMonster entries are in Teyvat overworld scene 3.
+		return 3;
+	}
+	
+	private Position getInvestigationMonsterMarkerPosition(
+			InvestigationMonsterData imd, int sceneId, int groupId, int monsterId) {
+		var group = getInvestigationGroup(sceneId, groupId);
+
+		if (group != null && group.monsters != null) {
+			var exactMonster =
+					group.monsters.values().stream()
+							.filter(monster -> monster.monster_id == monsterId)
+							.findFirst();
+
+			if (exactMonster.isPresent()) {
+				return exactMonster.get().pos;
+			}
+
+			if (imd.getMonsterIdList() != null && !imd.getMonsterIdList().isEmpty()) {
+				var relatedMonster =
+						group.monsters.values().stream()
+								.filter(monster -> imd.getMonsterIdList().contains(monster.monster_id))
+								.findFirst();
+
+				if (relatedMonster.isPresent()) {
+					return relatedMonster.get().pos;
+				}
+			}
+		}
+
+		if (imd.hasMapMarkerPosition()) {
+			var posData = imd.getDJLCKJCAKDA();
+			return new Position(posData.get(0), posData.get(1), posData.get(2));
+		}
+
+		return null;
+	}
 }

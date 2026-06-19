@@ -103,6 +103,13 @@ public class Scene {
 
 	private static final Position ICEWIND_PLAYER_START_ROT =
 			new Position(0f, 45f, 0f);
+			
+	private static final int PMA_ROUTE_BARRIER_SCENE_ID = 3;
+	private static final int PMA_ROUTE_BARRIER_GROUP_ID = 133220374;
+	private static final int PMA_ROUTE_BARRIER_CONFIG_A = 374001;
+	private static final int PMA_ROUTE_BARRIER_CONFIG_B = 374002;
+	private static final int PMA_ROUTE_BARRIER_GADGET_A = 70290155;
+	private static final int PMA_ROUTE_BARRIER_GADGET_B = 70290156;
 
 	private boolean icewindSuiteFallbackWeatherActive = false;
 	
@@ -447,6 +454,9 @@ public class Scene {
     }
 
     public synchronized void addEntity(GameEntity entity) {
+		if (this.isBlockedPmaRouteBarrierEntity(entity)) {
+			return;
+		}
         this.addEntityDirectly(entity);
         this.broadcastPacket(new PacketSceneEntityAppearNotify(entity));
     }
@@ -503,19 +513,28 @@ public class Scene {
     }
 
     public synchronized void addEntities(
-            Collection<? extends GameEntity> entities, VisionType visionType) {
-        if (entities == null || entities.isEmpty()) {
-            return;
-        }
+			Collection<? extends GameEntity> entities, VisionType visionType) {
+		if (entities == null || entities.isEmpty()) {
+			return;
+		}
 
-        for (var entity : entities) {
-            this.addEntityDirectly(entity);
-        }
+		var filteredEntities =
+				entities.stream()
+						.filter(entity -> !this.isBlockedPmaRouteBarrierEntity(entity))
+						.toList();
 
-        for (var l : chopped(new ArrayList<>(entities), 100)) {
-            this.broadcastPacket(new PacketSceneEntityAppearNotify(l, visionType));
-        }
-    }
+		if (filteredEntities.isEmpty()) {
+			return;
+		}
+
+		for (var entity : filteredEntities) {
+			this.addEntityDirectly(entity);
+		}
+
+		for (var l : chopped(new ArrayList<>(filteredEntities), 100)) {
+			this.broadcastPacket(new PacketSceneEntityAppearNotify(l, visionType));
+		}
+	}
 
     private GameEntity removeEntityDirectly(GameEntity entity) {
         var removed = getEntities().remove(entity.getId());
@@ -984,6 +1003,7 @@ public class Scene {
 		if (missingScriptOnly) {
 			visible.removeIf(entry -> !this.shouldUseLegacyFallbackSpawn(entry));
 		}
+		visible.removeIf(this::isBlockedPmaRouteBarrierSpawn);
 
 		// World level
 		WorldLevelData worldLevelData = GameData.getWorldLevelDataMap().get(getWorld().getWorldLevel());
@@ -1061,8 +1081,16 @@ public class Scene {
 		}
 
 		if (toAdd.size() > 0) {
-			toAdd.forEach(this::addEntityDirectly);
-			this.broadcastPacket(new PacketSceneEntityAppearNotify(toAdd, VisionType.VISION_TYPE_BORN));
+			var filteredToAdd =
+					toAdd.stream()
+							.filter(entity -> !this.isBlockedPmaRouteBarrierEntity(entity))
+							.toList();
+
+			if (!filteredToAdd.isEmpty()) {
+				filteredToAdd.forEach(this::addEntityDirectly);
+				this.broadcastPacket(
+						new PacketSceneEntityAppearNotify(filteredToAdd, VisionType.VISION_TYPE_BORN));
+			}
 		}
 
 		if (toRemove.size() > 0) {
@@ -1086,6 +1114,44 @@ public class Scene {
 		}
 
 		return false;
+	}
+	
+	private boolean isBlockedPmaRouteBarrierSpawn(SpawnDataEntry entry) {
+		if (entry == null || entry.getGroup() == null) {
+			return false;
+		}
+
+		if (this.getId() != PMA_ROUTE_BARRIER_SCENE_ID) {
+			return false;
+		}
+
+		if (entry.getGroup().getGroupId() != PMA_ROUTE_BARRIER_GROUP_ID) {
+			return false;
+		}
+
+		return (entry.getConfigId() == PMA_ROUTE_BARRIER_CONFIG_A
+						&& entry.getGadgetId() == PMA_ROUTE_BARRIER_GADGET_A)
+				|| (entry.getConfigId() == PMA_ROUTE_BARRIER_CONFIG_B
+						&& entry.getGadgetId() == PMA_ROUTE_BARRIER_GADGET_B);
+	}
+	
+	private boolean isBlockedPmaRouteBarrierEntity(GameEntity entity) {
+		if (this.getId() != PMA_ROUTE_BARRIER_SCENE_ID) {
+			return false;
+		}
+
+		if (!(entity instanceof EntityGadget gadget)) {
+			return false;
+		}
+
+		if (gadget.getGroupId() != PMA_ROUTE_BARRIER_GROUP_ID) {
+			return false;
+		}
+
+		return (gadget.getConfigId() == PMA_ROUTE_BARRIER_CONFIG_A
+						&& gadget.getGadgetId() == PMA_ROUTE_BARRIER_GADGET_A)
+				|| (gadget.getConfigId() == PMA_ROUTE_BARRIER_CONFIG_B
+						&& gadget.getGadgetId() == PMA_ROUTE_BARRIER_GADGET_B);
 	}
 
 	private boolean hasEquivalentScriptGadget(SpawnDataEntry entry) {
