@@ -1,4 +1,4 @@
-# List of changes:
+# Changes:
 
 * Restores the TrifleGadget item payload for dropped items.
 * Fixes enemy drops being stuck in midair and unable to be picked up.
