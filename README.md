@@ -113,8 +113,9 @@ Features and functionality of the ps is not guaranteed, try it yourself to see w
 This is possibly the only public PS with updated mob and gadget spawns! (Up to Version 5.4)
 
 # Outstanding bug(s) hall of fame:
-- Abyss (as expected) -  wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
-- Lunar Bloom
+- Abyss - wrong floor and chamber numbers being displayed (for example floor 0 chamber 1000) and buffs don't apply/change
+- Lunar Bloom doesn't work
+- Icewind Suite's special arena battle music is still not restored
 
 # Read the [handbook](handbook.md)!
 
