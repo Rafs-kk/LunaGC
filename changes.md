@@ -52,6 +52,14 @@
 * Preserves boss drops for fallback-spawned Icewind Suite monsters.
 * Updates Drop.json with tested boss artifact/prayer/gem drops.
 * Restores Setekh Wenut's missing on-defeat boss reward logic by adding the Trounce Blossom gadget and wiring the ANY_MONSTER_DIE trigger to create it after the boss is defeated.
+* Fixes InvestigationMonster data used by the Adventurer Handbook and world map boss markers.
+* Using actual Lua monster positions for boss markers when available.
+* Echoing isForMark in GetInvestigationMonsterRsp.
+* Building map-marker entries directly from InvestigationMonsterConfigData.
+* Deriving valid scene IDs from boss group IDs when CityData scene IDs are missing.
+* Restoring the Adventurer Handbook Enemies tab population and tracking behavior.
+* Skipping the broken Araumi/PMA route barrier gadgets that block access to the Perpetual Mechanical Array underground route.
+* Moves the Icewind Suite InvestigationMonster marker closer to the actual arena/fallback fight position.
 
 # Tested:
 
@@ -97,8 +105,13 @@
 * Weather changes during the fight and resets after leaving.
 * Boss HP/drops work through the fallback fight.
 * Setekh Wenut now spawns its Trounce Blossom after defeat and gives proper boss rewards through a resource script fix.
+* Adventurer Handbook Enemies tab now populates and boss/enemy tracking works.
+* World map boss markers are restored for normal overworld bosses.
+* Boss marker positions now prefer actual Lua monster spawn positions when available.
+* Perpetual Mechanical Array underground route barrier no longer blocks access; the broken Araumi route barrier gadgets are skipped server-side.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 * The 6.0 client sends some avatar upgrade/promote request data through fields not mapped by the current generated proto classes, so the handlers include compatibility decoding for those fields.
 * The current domain fix manually encodes the packet payload instead of regenerating all proto classes, because the existing generated 6.0.0 proto mapping does not match the client’s expected field layout for this packet.
+* Icewind Suite InvestigationMonster marker fixed placement compensates for the incomplete scene3_group133402002.lua script, which prevents the marker system from resolving a real Lua monster position for Icewind Suite like it can for most other bosses.
