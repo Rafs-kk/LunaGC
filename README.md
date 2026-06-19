@@ -2,7 +2,7 @@
 
 This is a personal fork of LunaGC for 6.0. I made this because I mostly play on this version, and I wanted to fix a few lingering bugs that affected normal gameplay.
 
-[List of changes/fixes](changes.md)!
+[List of changes/fixes](changes.md)
 
 ## Updated version of Grasscutters, with some new features implemented.
 
