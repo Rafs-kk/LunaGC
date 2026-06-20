@@ -60,6 +60,9 @@
 * Restoring the Adventurer Handbook Enemies tab population and tracking behavior.
 * Skipping the broken Araumi/PMA route barrier gadgets that block access to the Perpetual Mechanical Array underground route.
 * Moves the Icewind Suite InvestigationMonster marker closer to the actual arena/fallback fight position.
+* Golden Wolflord is now farmable through a virtual HP fallback that avoids the broken Rifthound Skull shield phase.
+* Golden Wolflord arena weather now changes to the intended dark and gloomy ambience during the fight and resets after defeat or leaving the area.
+* Golden Wolflord’s premature boss blossom spawn is blocked from static/fallback spawns so the reward blossom can appear after defeat.
 
 # Tested:
 
@@ -109,6 +112,10 @@
 * World map boss markers are restored for normal overworld bosses.
 * Boss marker positions now prefer actual Lua monster spawn positions when available.
 * Perpetual Mechanical Array underground route barrier no longer blocks access; the broken Araumi route barrier gadgets are skipped server-side.
+* Confirmed Golden Wolflord's fallback to prevent the broken Rifthound Skull shield phase from softlocking the fight.
+* The boss now uses virtual HP while keeping its displayed HP above the unsupported shield threshold, allowing it to be defeated normally even though the skull phase is not implemented.
+* The arena weather is also applied Java-side during the fight and reset after defeat or leaving.
+* Golden Wolflord's Trounce Blossom now spawns normally after the boss is defeated.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
