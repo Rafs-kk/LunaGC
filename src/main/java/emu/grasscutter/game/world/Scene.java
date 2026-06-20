@@ -110,6 +110,27 @@ public class Scene {
 	private static final int PMA_ROUTE_BARRIER_CONFIG_B = 374002;
 	private static final int PMA_ROUTE_BARRIER_GADGET_A = 70290155;
 	private static final int PMA_ROUTE_BARRIER_GADGET_B = 70290156;
+	
+	private static final int GOLDEN_WOLFLORD_SCENE_ID = 3;
+	private static final int GOLDEN_WOLFLORD_GROUP_ID = 133225275;
+	private static final int GOLDEN_WOLFLORD_CONFIG_ID = 275002;
+	private static final int GOLDEN_WOLFLORD_MONSTER_ID = 22060101;
+	private static final int GOLDEN_WOLFLORD_WEATHER_ID = 3321;
+	private static final int GOLDEN_WOLFLORD_DEFAULT_WEATHER_ID = 0;
+
+	private static final int GOLDEN_WOLFLORD_BLOSSOM_CONFIG_ID = 275007;
+	private static final int GOLDEN_WOLFLORD_BLOSSOM_GADGET_ID = 70210106;
+
+	private static final float GOLDEN_WOLFLORD_MIN_DISPLAY_HP_RATIO = 0.72f;
+	private static final float GOLDEN_WOLFLORD_WEATHER_RADIUS = 90.0f;
+
+	private static final Position GOLDEN_WOLFLORD_ARENA_POS =
+			new Position(-6657.744f, 193.481f, -2661.123f);
+
+	private boolean goldenWolflordWeatherActive = false;
+
+	private final Map<Integer, Float> goldenWolflordVirtualHp = new ConcurrentHashMap<>();
+	private final Map<Integer, Float> goldenWolflordVirtualMaxHp = new ConcurrentHashMap<>();
 
 	private boolean icewindSuiteFallbackWeatherActive = false;
 	
@@ -300,6 +321,9 @@ public class Scene {
 		if (this.getId() == ICEWIND_SCENE_ID && this.icewindSuiteFallbackWeatherActive) {
 			this.resetIcewindSuiteFallbackWeather(player);
 		}
+		if (this.getId() == GOLDEN_WOLFLORD_SCENE_ID && this.goldenWolflordWeatherActive) {
+			this.resetGoldenWolflordFallbackWeather(player);
+		}
         // Remove from challenge if leaving
         if (this.getChallenge() != null && this.getChallenge().inProgress()) {
             player.sendPacket(new PacketDungeonChallengeFinishNotify(this.getChallenge()));
@@ -307,6 +331,10 @@ public class Scene {
 
         // Remove player from scene
         getPlayers().remove(player);
+		
+		if (getPlayers().isEmpty()) {
+			this.goldenWolflordWeatherActive = false;
+		}
         player.setScene(null);
 
         // Remove player avatars
@@ -606,6 +634,12 @@ public class Scene {
             }
         }
 		
+		if (target instanceof EntityMonster monster && this.isGoldenWolflordMonster(monster)) {
+			if (this.handleGoldenWolflordVirtualDamage(monster, result.getDamage(), result.getAttackerId())) {
+				return;
+			}
+		}
+		
 		if (target instanceof EntityMonster monster && this.isIcewindFallbackMonster(monster)) {
 			if (this.handleIcewindSuiteVirtualDamage(monster, result.getDamage(), result.getAttackerId())) {
 				return;
@@ -775,6 +809,7 @@ public class Scene {
 		if (this.tickCount % 20 == 0) {
 			this.checkIcewindSuiteFallbackAntiStall(sceneTime);
 			this.checkIcewindSuiteFallbackReset();
+			this.checkGoldenWolflordFallbackWeatherState();
 		}
 
         this.finishLoading();
@@ -1004,6 +1039,7 @@ public class Scene {
 			visible.removeIf(entry -> !this.shouldUseLegacyFallbackSpawn(entry));
 		}
 		visible.removeIf(this::isBlockedPmaRouteBarrierSpawn);
+		visible.removeIf(this::isPrematureGoldenWolflordBlossomSpawn);
 
 		// World level
 		WorldLevelData worldLevelData = GameData.getWorldLevelDataMap().get(getWorld().getWorldLevel());
@@ -2112,6 +2148,198 @@ public class Scene {
 						"[IcewindSuiteFallback] Virtual damage: entityId={}, monsterId={}, damage={}, virtualHp={}/{}, actualHp={}",
 						monster.getId(),
 						monster.getMonsterData().getId(),
+						amount,
+						virtualHp,
+						virtualMaxHp,
+						monster.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP));
+
+		return true;
+	}
+	
+	private boolean isGoldenWolflordMonster(EntityMonster monster) {
+		return this.getId() == GOLDEN_WOLFLORD_SCENE_ID
+				&& monster != null
+				&& monster.getGroupId() == GOLDEN_WOLFLORD_GROUP_ID
+				&& monster.getConfigId() == GOLDEN_WOLFLORD_CONFIG_ID
+				&& monster.getMonsterData() != null
+				&& monster.getMonsterData().getId() == GOLDEN_WOLFLORD_MONSTER_ID;
+	}
+
+	private boolean isPrematureGoldenWolflordBlossomSpawn(SpawnDataEntry entry) {
+		if (entry == null || entry.getGroup() == null) {
+			return false;
+		}
+
+		if (this.getId() != GOLDEN_WOLFLORD_SCENE_ID) {
+			return false;
+		}
+
+		if (entry.getGroup().getGroupId() != GOLDEN_WOLFLORD_GROUP_ID) {
+			return false;
+		}
+
+		return entry.getConfigId() == GOLDEN_WOLFLORD_BLOSSOM_CONFIG_ID
+				&& entry.getGadgetId() == GOLDEN_WOLFLORD_BLOSSOM_GADGET_ID;
+	}
+
+	private void checkGoldenWolflordFallbackWeatherState() {
+		if (this.getId() != GOLDEN_WOLFLORD_SCENE_ID) {
+			return;
+		}
+
+		this.cleanupGoldenWolflordVirtualHp();
+
+		boolean playerNearArena =
+				this.getPlayers().stream()
+						.anyMatch(
+								player ->
+										player.getPosition().computeDistance(GOLDEN_WOLFLORD_ARENA_POS)
+												<= GOLDEN_WOLFLORD_WEATHER_RADIUS);
+
+		boolean bossAlive =
+				this.getEntities().values().stream()
+						.anyMatch(
+								entity ->
+										entity instanceof EntityMonster monster
+												&& this.isGoldenWolflordMonster(monster)
+												&& monster.isAlive());
+
+		if (playerNearArena && bossAlive) {
+			this.activateGoldenWolflordFallbackWeather();
+		} else {
+			this.resetGoldenWolflordFallbackWeather();
+		}
+	}
+
+	private void activateGoldenWolflordFallbackWeather() {
+		if (this.getId() != GOLDEN_WOLFLORD_SCENE_ID) {
+			return;
+		}
+
+		if (this.goldenWolflordWeatherActive) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			player.setWeather(GOLDEN_WOLFLORD_WEATHER_ID, ClimateType.CLIMATE_SUNNY);
+		}
+
+		this.goldenWolflordWeatherActive = true;
+
+		Grasscutter.getLogger()
+				.debug("[GoldenWolflordFallback] Set arena weather to {}", GOLDEN_WOLFLORD_WEATHER_ID);
+	}
+
+	private void resetGoldenWolflordFallbackWeather() {
+		if (this.getId() != GOLDEN_WOLFLORD_SCENE_ID) {
+			return;
+		}
+
+		if (!this.goldenWolflordWeatherActive) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			this.resetGoldenWolflordFallbackWeather(player);
+		}
+
+		this.goldenWolflordWeatherActive = false;
+	}
+
+	private void resetGoldenWolflordFallbackWeather(Player player) {
+		if (player == null) {
+			return;
+		}
+
+		player.setWeather(GOLDEN_WOLFLORD_DEFAULT_WEATHER_ID, ClimateType.CLIMATE_SUNNY);
+	}
+
+	private void cleanupGoldenWolflordVirtualHp() {
+		var liveIds =
+				this.getEntities().values().stream()
+						.filter(entity -> entity instanceof EntityMonster)
+						.map(entity -> (EntityMonster) entity)
+						.filter(this::isGoldenWolflordMonster)
+						.filter(EntityMonster::isAlive)
+						.map(EntityMonster::getId)
+						.collect(Collectors.toSet());
+
+		this.goldenWolflordVirtualHp.keySet().removeIf(id -> !liveIds.contains(id));
+		this.goldenWolflordVirtualMaxHp.keySet().removeIf(id -> !liveIds.contains(id));
+	}
+
+	private void setGoldenWolflordDisplayedHp(EntityMonster monster) {
+		if (monster == null || !this.isGoldenWolflordMonster(monster)) {
+			return;
+		}
+
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		float virtualMaxHp = this.goldenWolflordVirtualMaxHp.getOrDefault(monster.getId(), maxHp);
+		float virtualHp = this.goldenWolflordVirtualHp.getOrDefault(monster.getId(), virtualMaxHp);
+
+		if (maxHp <= 0f || virtualMaxHp <= 0f) {
+			return;
+		}
+
+		float virtualRatio = Math.max(0f, Math.min(1f, virtualHp / virtualMaxHp));
+
+		// Keep real HP above the broken 70% shield threshold.
+		// Visible HP moves from 100% down to ~72%, then the boss dies when virtual HP reaches 0.
+		float displayRatio =
+				GOLDEN_WOLFLORD_MIN_DISPLAY_HP_RATIO
+						+ ((1f - GOLDEN_WOLFLORD_MIN_DISPLAY_HP_RATIO) * virtualRatio);
+
+		displayRatio = Math.max(GOLDEN_WOLFLORD_MIN_DISPLAY_HP_RATIO, displayRatio);
+
+		monster.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, maxHp * displayRatio);
+		this.broadcastPacket(new PacketEntityFightPropUpdateNotify(monster, FightProperty.FIGHT_PROP_CUR_HP));
+	}
+
+	private boolean handleGoldenWolflordVirtualDamage(
+			EntityMonster monster, float amount, int attackerId) {
+		if (monster == null || !this.isGoldenWolflordMonster(monster)) {
+			return false;
+		}
+
+		if (!monster.isAlive()) {
+			return true;
+		}
+
+		float maxHp = monster.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		float virtualMaxHp = this.goldenWolflordVirtualMaxHp.getOrDefault(monster.getId(), maxHp);
+		float virtualHp = this.goldenWolflordVirtualHp.getOrDefault(monster.getId(), virtualMaxHp);
+
+		this.goldenWolflordVirtualMaxHp.putIfAbsent(monster.getId(), virtualMaxHp);
+		this.goldenWolflordVirtualHp.putIfAbsent(monster.getId(), virtualHp);
+
+		if (amount <= 0f) {
+			this.setGoldenWolflordDisplayedHp(monster);
+			return true;
+		}
+
+		virtualHp = Math.max(0f, virtualHp - amount);
+
+		this.goldenWolflordVirtualMaxHp.put(monster.getId(), virtualMaxHp);
+		this.goldenWolflordVirtualHp.put(monster.getId(), virtualHp);
+
+		if (virtualHp <= 0f) {
+			monster.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, 0f);
+			this.broadcastPacket(new PacketEntityFightPropUpdateNotify(monster, FightProperty.FIGHT_PROP_CUR_HP));
+
+			this.goldenWolflordVirtualHp.remove(monster.getId());
+			this.goldenWolflordVirtualMaxHp.remove(monster.getId());
+
+			this.killEntity(monster, attackerId);
+			this.resetGoldenWolflordFallbackWeather();
+			return true;
+		}
+
+		this.setGoldenWolflordDisplayedHp(monster);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[GoldenWolflordFallback] Virtual damage: entityId={}, damage={}, virtualHp={}/{}, actualHp={}",
+						monster.getId(),
 						amount,
 						virtualHp,
 						virtualMaxHp,
