@@ -65,6 +65,11 @@
 * Golden Wolflord’s premature boss blossom spawn is blocked from static/fallback spawns so the reward blossom can appear after defeat.
 * Changes Thunder Manifestation's boss group to start from its active suite so the boss consistently appears after relog/restart.
 * The full arena/platform is controlled by scene tag 112, which can be enabled once with `/tag add 112`. Once enabled, the arena persists across relogs and the boss fight, reward blossom, and boss materials work normally.
+* Adds a regional Seirai Island weather fallback in Scene.java.
+* Applies Thunder Manifestation arena weather near the high-altitude Amakumo Peak platform.
+* Applies lower Amakumo Peak, Seiraimaru/Koseki Village, initial Seirai Island, and Asase Shrine weather based on player position.
+* Resets weather to default when leaving Seirai weather fallback zones or leaving scene 3.
+* Applies Seirai fallback weather immediately after entering/spawning to reduce brief default-weather flicker after teleporting.
 
 # Tested:
 
@@ -121,6 +126,12 @@
 * Thunder Manifestation boss group now starts in its active suite, making the boss consistently spawn after relog/restart.
 * Thunder Manifestation arena/platform is restored by enabling scene tag 112.
 * The boss wakes up, fights normally, drops a reward blossom after defeat, and gives the correct materials.
+* Thunder Manifestation arena uses the intended high-altitude arena weather.
+* Lower Amakumo Peak uses the intended storm weather.
+* Seiraimaru/Koseki Village uses the intended local Seirai weather.
+* Initial Seirai Island / Slumbering Court side uses the intended local weather.
+* Asase Shrine uses its calmer local weather.
+* Teleporting away from Seirai resets weather back to default.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
