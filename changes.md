@@ -63,6 +63,8 @@
 * Golden Wolflord is now farmable through a virtual HP fallback that avoids the broken Rifthound Skull shield phase.
 * Golden Wolflord arena weather now changes to the intended dark and gloomy ambience during the fight and resets after defeat or leaving the area.
 * Golden Wolflord’s premature boss blossom spawn is blocked from static/fallback spawns so the reward blossom can appear after defeat.
+* Changes Thunder Manifestation's boss group to start from its active suite so the boss consistently appears after relog/restart.
+* The full arena/platform is controlled by scene tag 112, which can be enabled once with `/tag add 112`. Once enabled, the arena persists across relogs and the boss fight, reward blossom, and boss materials work normally.
 
 # Tested:
 
@@ -116,9 +118,13 @@
 * The boss now uses virtual HP while keeping its displayed HP above the unsupported shield threshold, allowing it to be defeated normally even though the skull phase is not implemented.
 * The arena weather is also applied Java-side during the fight and reset after defeat or leaving.
 * Golden Wolflord's Trounce Blossom now spawns normally after the boss is defeated.
+* Thunder Manifestation boss group now starts in its active suite, making the boss consistently spawn after relog/restart.
+* Thunder Manifestation arena/platform is restored by enabling scene tag 112.
+* The boss wakes up, fights normally, drops a reward blossom after defeat, and gives the correct materials.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
 * The 6.0 client sends some avatar upgrade/promote request data through fields not mapped by the current generated proto classes, so the handlers include compatibility decoding for those fields.
 * The current domain fix manually encodes the packet payload instead of regenerating all proto classes, because the existing generated 6.0.0 proto mapping does not match the client’s expected field layout for this packet.
 * Icewind Suite InvestigationMonster marker fixed placement compensates for the incomplete scene3_group133402002.lua script, which prevents the marker system from resolving a real Lua monster position for Icewind Suite like it can for most other bosses.
+* Players need to run `/tag add 112` once to permanently reveal the full Thunder Manifestation arena/platform. Preferably at the highest Teleport Waypoint in Amakumo Peak.
