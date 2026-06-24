@@ -180,6 +180,41 @@ public class Scene {
 	private static final float SEIRAI_AMAKUMO_LOWER_RADIUS = 560.0f;
 	
 	private final Map<Integer, Integer> seiraiFallbackWeatherByUid = new ConcurrentHashMap<>();
+	
+	private final Map<Integer, Integer> dragonspineFallbackWeatherByUid = new ConcurrentHashMap<>();
+
+	private static final int DRAGONSPINE_SCENE_ID = 3;
+
+	private static final int DRAGONSPINE_WEATHER_DEFAULT = 0;
+	private static final int DRAGONSPINE_WEATHER_GENERAL = 2022;
+	private static final int DRAGONSPINE_WEATHER_CRYO_HYPOSTASIS = 2125;
+
+	private static final Position DRAGONSPINE_CORE_POS =
+        new Position(1150.0f, 300.0f, -950.0f);
+
+	private static final Position DRAGONSPINE_OUTSKIRTS_POS =
+			new Position(1460.2603f, 268.03598f, -573.91376f);
+
+	private static final Position DRAGONSPINE_WATER_OUTSKIRTS_POS =
+			new Position(826.83826f, 199.61209f, -1335.8583f);
+
+	private static final Position DRAGONSPINE_LIYUE_SIDE_WAYPOINT_POS =
+			new Position(860.82733f, 326.54297f, -486.15005f);
+
+	private static final Position DRAGONSPINE_CRYO_HYPOSTASIS_SIDE_POS =
+			new Position(1236.6396f, 293.92908f, -556.36945f);
+
+	private static final Position DRAGONSPINE_NORTH_LIYUE_PASS_POS =
+			new Position(1161.982f, 270.2541f, -410.60388f);
+
+	private static final float DRAGONSPINE_CORE_RADIUS = 420.0f;
+	private static final float DRAGONSPINE_OUTSKIRTS_RADIUS = 90.0f;
+	private static final float DRAGONSPINE_WATER_OUTSKIRTS_RADIUS = 180.0f;
+	private static final float DRAGONSPINE_LIYUE_SIDE_RADIUS = 100.0f;
+	private static final float DRAGONSPINE_CRYO_HYPOSTASIS_SIDE_RADIUS = 120.0f;
+	private static final float DRAGONSPINE_NORTH_LIYUE_PASS_RADIUS = 90.0f;
+	private static final float DRAGONSPINE_CRYO_HYPOSTASIS_EXCLUSION_RADIUS = 145.0f;
+	
 
     @Getter private GameEntity sceneEntity;
     @Getter private final ServerTaskScheduler scheduler;
@@ -350,6 +385,7 @@ public class Scene {
 
         this.setupPlayerAvatars(player);
 		this.applySeiraiFallbackWeather(player, false);
+		this.applyDragonspineFallbackWeather(player, false);
     }
 
     public synchronized void removePlayer(Player player) {
@@ -364,6 +400,10 @@ public class Scene {
 		
 		if (this.getId() == SEIRAI_SCENE_ID && this.seiraiFallbackWeatherByUid.remove(player.getUid()) != null) {
 			player.setWeather(SEIRAI_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
+		}
+		
+		if (this.getId() == DRAGONSPINE_SCENE_ID && this.dragonspineFallbackWeatherByUid.remove(player.getUid()) != null) {
+			player.setWeather(DRAGONSPINE_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
 		}
 		
         if (this.getChallenge() != null && this.getChallenge().inProgress()) {
@@ -457,6 +497,7 @@ public class Scene {
 
         this.addEntity(teamManager.getCurrentAvatarEntity());
 		this.applySeiraiFallbackWeather(player, false);
+		this.applyDragonspineFallbackWeather(player, false);
 
         // Notify the client of any extra skill charges
         teamManager.getActiveTeam().stream()
@@ -856,6 +897,7 @@ public class Scene {
 
 		if (this.tickCount % 5 == 0) {
 			this.checkSeiraiFallbackWeather();
+			this.checkDragonspineFallbackWeather();
 		}
 
         this.finishLoading();
@@ -2466,10 +2508,18 @@ public class Scene {
 						player.getUid(), SEIRAI_WEATHER_DEFAULT);
 
 		if (desiredWeather == SEIRAI_WEATHER_DEFAULT) {
+			boolean dragonspineOwnsWeather = this.getDesiredDragonspineWeather(player.getPosition()) != DRAGONSPINE_WEATHER_DEFAULT;
+
+			if (hadFallbackWeather && dragonspineOwnsWeather) {
+				this.seiraiFallbackWeatherByUid.remove(player.getUid());
+				return;
+			}
+
 			if (allowDefaultReset && hadFallbackWeather) {
 				player.setWeather(SEIRAI_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
 				this.seiraiFallbackWeatherByUid.remove(player.getUid());
 			}
+
 			return;
 		}
 
@@ -2477,5 +2527,89 @@ public class Scene {
 			player.setWeather(desiredWeather, ClimateType.CLIMATE_SUNNY);
 			this.seiraiFallbackWeatherByUid.put(player.getUid(), desiredWeather);
 		}
+	}
+	
+	private void checkDragonspineFallbackWeather() {
+		if (this.getId() != DRAGONSPINE_SCENE_ID) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			this.applyDragonspineFallbackWeather(player, true);
+		}
+	}
+
+	private void applyDragonspineFallbackWeather(Player player, boolean allowDefaultReset) {
+		if (player == null || this.getId() != DRAGONSPINE_SCENE_ID) {
+			return;
+		}
+
+		int desiredWeather = this.getDesiredDragonspineWeather(player.getPosition());
+		boolean hadFallbackWeather = this.dragonspineFallbackWeatherByUid.containsKey(player.getUid());
+		int currentWeather =
+				this.dragonspineFallbackWeatherByUid.getOrDefault(
+						player.getUid(), DRAGONSPINE_WEATHER_DEFAULT);
+
+		if (desiredWeather == DRAGONSPINE_WEATHER_DEFAULT) {
+			boolean seiraiOwnsWeather = this.getDesiredSeiraiWeather(player.getPosition()) != SEIRAI_WEATHER_DEFAULT;
+
+			if (hadFallbackWeather && seiraiOwnsWeather) {
+				this.dragonspineFallbackWeatherByUid.remove(player.getUid());
+				return;
+			}
+
+			if (allowDefaultReset && hadFallbackWeather) {
+				player.setWeather(DRAGONSPINE_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
+				this.dragonspineFallbackWeatherByUid.remove(player.getUid());
+			}
+
+			return;
+		}
+
+		if (!hadFallbackWeather || desiredWeather != currentWeather) {
+			player.setWeather(desiredWeather, ClimateType.CLIMATE_SUNNY);
+			this.dragonspineFallbackWeatherByUid.put(player.getUid(), desiredWeather);
+		}
+	}
+
+	private int getDesiredDragonspineWeather(Position pos) {
+		if (pos == null) {
+			return DRAGONSPINE_WEATHER_DEFAULT;
+		}
+
+		// Cryo Hypostasis appears to depend on its local/default boss-area state.
+		if (this.isInCryoHypostasisWeatherSensitiveZone(pos)) {
+			return DRAGONSPINE_WEATHER_CRYO_HYPOSTASIS;
+		}
+
+		if (this.isInDragonspineWeatherZone(pos)) {
+			return DRAGONSPINE_WEATHER_GENERAL;
+		}
+
+		return DRAGONSPINE_WEATHER_DEFAULT;
+	}
+
+	private boolean isInDragonspineWeatherZone(Position pos) {
+		return this.isNear2d(pos, DRAGONSPINE_CORE_POS, DRAGONSPINE_CORE_RADIUS)
+				|| this.isNear2d(pos, DRAGONSPINE_OUTSKIRTS_POS, DRAGONSPINE_OUTSKIRTS_RADIUS)
+				|| this.isNear2d(
+						pos,
+						DRAGONSPINE_WATER_OUTSKIRTS_POS,
+						DRAGONSPINE_WATER_OUTSKIRTS_RADIUS)
+				|| this.isNear2d(
+						pos,
+						DRAGONSPINE_LIYUE_SIDE_WAYPOINT_POS,
+						DRAGONSPINE_LIYUE_SIDE_RADIUS)
+				|| this.isNear2d(
+						pos,
+						DRAGONSPINE_NORTH_LIYUE_PASS_POS,
+						DRAGONSPINE_NORTH_LIYUE_PASS_RADIUS);
+	}
+	
+	private boolean isInCryoHypostasisWeatherSensitiveZone(Position pos) {
+		return this.isNear2d(
+				pos,
+				DRAGONSPINE_CRYO_HYPOSTASIS_SIDE_POS,
+				DRAGONSPINE_CRYO_HYPOSTASIS_EXCLUSION_RADIUS);
 	}
 }
