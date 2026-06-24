@@ -70,6 +70,13 @@
 * Applies lower Amakumo Peak, Seiraimaru/Koseki Village, initial Seirai Island, and Asase Shrine weather based on player position.
 * Resets weather to default when leaving Seirai weather fallback zones or leaving scene 3.
 * Applies Seirai fallback weather immediately after entering/spawning to reduce brief default-weather flicker after teleporting.
+* Removes unsafe setTargetEntityIdList(index, value)
+* Removes unsafe setTargetLockPointIndexList(index, value)
+* Uses addTargetEntityIdList(...) only if targetEntityId > 0
+* Removes unsafe ownerEntity null fallback
+* Guard null/empty dropVecList
+* Fix worldLevel bounds check
+* Skip invalid blossom preview entries instead of crashing notifyIcon()
 
 # Tested:
 
