@@ -1,7 +1,5 @@
 package emu.grasscutter.game.entity;
 
-import java.util.List;
-
 import emu.grasscutter.data.GameData;
 import emu.grasscutter.data.binout.config.ConfigEntityGadget;
 import emu.grasscutter.data.binout.config.fields.ConfigAbilityData;
@@ -70,9 +68,9 @@ public class EntityClientGadget extends EntityBaseGadget {
         this.localId = notify.getLocalId();
         this.gadgetId = notify.getConfigId();
         this.ownerEntityId = notify.getOwnerEntityId();
-        this.propOwnerEntityId = notify.getPropOwnerEntityId();
-        this.targetEntityId = notify.getTargetEntityId();
-        this.asyncLoad = notify.getIsAsyncLoad();
+		this.propOwnerEntityId = notify.getPropOwnerEntityId();
+		this.targetEntityId = notify.getTargetEntityId();
+		this.asyncLoad = notify.getIsAsyncLoad();
 
         this.gadgetData = GameData.getGadgetDataMap().get(gadgetId);
         if (gadgetData != null && gadgetData.getJsonName() != null) {
@@ -185,17 +183,18 @@ public class EntityClientGadget extends EntityBaseGadget {
 		ClientGadgetInfoOuterClass.ClientGadgetInfo clientGadget = clientGadgetBuilder.build();
 
         SceneGadgetInfo.Builder gadgetInfo =
-                SceneGadgetInfo.newBuilder()
-                        .setGadgetId(this.getGadgetId())
-                        .setOwnerEntityId(this.getOwnerEntityId())
-                        .setBornType(this.getBornType())
-                        .setGadgetState(this.getGadgetState())
-    
-                        .setIsEnableInteract(true)
-                        .setPropOwnerEntityId(this.getPropOwnerEntityId())
-                        .setClientGadget(clientGadget)
-                        .setPropOwnerEntityId(this.getOwnerEntityId())
-                        .setAuthorityPeerId(this.getOwner().getPeerId());
+				SceneGadgetInfo.newBuilder()
+						.setGadgetId(this.getGadgetId())
+						.setOwnerEntityId(this.getOwnerEntityId())
+						.setGadgetState(this.getGadgetState())
+						.setIsEnableInteract(true)
+						.setPropOwnerEntityId(this.getPropOwnerEntityId())
+						.setClientGadget(clientGadget)
+						.setAuthorityPeerId(this.getOwner().getPeerId());
+
+		if (this.getBornType() != null) {
+			gadgetInfo.setBornType(this.getBornType());
+		}
 
         entityInfo.setGadget(gadgetInfo);
 
