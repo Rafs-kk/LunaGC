@@ -135,19 +135,22 @@ public class BlossomManager {
                                     .forEach(
                                             spawn -> {
                                                 var type = BlossomType.valueOf(spawn.getGadgetId());
-                                                int previewReward = getPreviewReward(type, worldLevel);
-                                                blossoms.add(
-                                                        BlossomBriefInfoOuterClass.BlossomBriefInfo.newBuilder()
-                                                                .setSceneId(sceneId)
-                                                                .setPos(spawn.getPos().toProto())
-                                                                .setResin(20)
-                                                                .setMonsterLevel(monsterLevel)
-                                                                .setRewardId(previewReward)
-                                                                .setCircleCampId(type.getCircleCampId())
-                                                                .setRefreshId(
-                                                                        type.getBlossomChestId()) // TODO: replace when using actual
-                                                                // leylines
-                                                                .build());
+												Integer previewReward = getPreviewReward(type, worldLevel);
+
+												if (previewReward == null) {
+													return;
+												}
+
+												blossoms.add(
+														BlossomBriefInfoOuterClass.BlossomBriefInfo.newBuilder()
+																.setSceneId(sceneId)
+																.setPos(spawn.getPos().toProto())
+																.setResin(20)
+																.setMonsterLevel(monsterLevel)
+																.setRewardId(previewReward)
+																.setCircleCampId(type.getCircleCampId())
+																.setRefreshId(type.getBlossomChestId())
+																.build());
                                             });
                         });
         scene.broadcastPacket(new PacketBlossomBriefInfoNotify(blossoms));
@@ -158,27 +161,65 @@ public class BlossomManager {
     }
 
     private static Integer getPreviewReward(BlossomType type, int worldLevel) {
-        // TODO: blossoms should be based on their city
-        if (type == null) {
-            Grasscutter.getLogger().error("Illegal blossom type {}", type);
-            return null;
-        }
+		// TODO: blossoms should be based on their city
+		if (type == null) {
+			Grasscutter.getLogger().debug("Illegal blossom type {}", type);
+			return null;
+		}
 
-        int blossomChestId = type.getBlossomChestId();
-        var dataMap = GameData.getBlossomRefreshExcelConfigDataMap();
-        for (var data : dataMap.values()) {
-            if (blossomChestId == data.getBlossomChestId()) {
-                var dropVecList = data.getDropVec();
-                if (worldLevel > dropVecList.length) {
-                    Grasscutter.getLogger().error("Illegal world level {}", worldLevel);
-                    return null;
-                }
-                return dropVecList[worldLevel].getPreviewReward();
-            }
-        }
-        Grasscutter.getLogger().error("Cannot find blossom type {}", type);
-        return null;
-    }
+		int blossomChestId = type.getBlossomChestId();
+		var dataMap = GameData.getBlossomRefreshExcelConfigDataMap();
+
+		if (dataMap == null || dataMap.isEmpty()) {
+			Grasscutter.getLogger().debug("Blossom refresh config data is missing.");
+			return null;
+		}
+
+		for (var data : dataMap.values()) {
+			if (data == null) {
+				continue;
+			}
+
+			if (blossomChestId == data.getBlossomChestId()) {
+				var dropVecList = data.getDropVec();
+
+				if (dropVecList == null || dropVecList.length == 0) {
+					Grasscutter.getLogger()
+							.debug(
+									"Blossom refresh config has no drop vector: blossomChestId={}, type={}",
+									blossomChestId,
+									type);
+					return null;
+				}
+
+				if (worldLevel < 0 || worldLevel >= dropVecList.length) {
+					Grasscutter.getLogger()
+							.debug(
+									"Illegal blossom world level: worldLevel={}, dropVecLength={}, blossomChestId={}, type={}",
+									worldLevel,
+									dropVecList.length,
+									blossomChestId,
+									type);
+					return null;
+				}
+
+				if (dropVecList[worldLevel] == null) {
+					Grasscutter.getLogger()
+							.debug(
+									"Blossom drop vector entry is null: worldLevel={}, blossomChestId={}, type={}",
+									worldLevel,
+									blossomChestId,
+									type);
+					return null;
+				}
+
+				return dropVecList[worldLevel].getPreviewReward();
+			}
+		}
+
+		Grasscutter.getLogger().debug("Cannot find blossom type {}", type);
+		return null;
+	}
 
     private static RewardPreviewData getRewardList(BlossomType type, int worldLevel) {
         Integer previewReward = getPreviewReward(type, worldLevel);

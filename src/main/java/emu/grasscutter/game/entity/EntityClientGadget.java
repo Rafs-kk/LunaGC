@@ -80,15 +80,13 @@ public class EntityClientGadget extends EntityBaseGadget {
         }
 
         GameEntity ownerEntity = scene.getEntityById(this.ownerEntityId);
-        ownerEntity = findOwnerEntity(ownerEntity);
-        if (ownerEntity == null) {
-            ownerEntity = ownerEntity.getScene().getEntityById(16777225);
-        }
-        if (ownerEntity instanceof EntityClientGadget ownerGadget) {
-            this.originalOwnerEntityId = ownerGadget.getOriginalOwnerEntityId();
-        } else {
-            this.originalOwnerEntityId = this.ownerEntityId;
-        }
+		ownerEntity = findOwnerEntity(ownerEntity);
+
+		if (ownerEntity instanceof EntityClientGadget ownerGadget) {
+			this.originalOwnerEntityId = ownerGadget.getOriginalOwnerEntityId();
+		} else {
+			this.originalOwnerEntityId = this.ownerEntityId;
+		}
 
         this.initAbilities();
     }
@@ -170,18 +168,21 @@ public class EntityClientGadget extends EntityBaseGadget {
                 .build();
         entityInfo.addFightPropList(pair2);
 
-        ClientGadgetInfoOuterClass.ClientGadgetInfo clientGadget =
-                ClientGadgetInfoOuterClass.ClientGadgetInfo.newBuilder()
-                        .setCampId(this.getCampId())
-                        .setCampType(this.getCampType())
-                        .setGuid(this.getGuid())
-                        .setOwnerEntityId(this.getOwnerEntityId())
-                        .setTargetEntityId(this.getTargetEntityId())
-                        .setAsyncLoad(this.isAsyncLoad())
-                        .setIsPeerIdFromPlayer(this.isPeerIdFromPlayer())
-                        .setTargetEntityIdList(this.getTargetEntityIdList(), this.targetEntityIdList)
-                        .setTargetLockPointIndexList(this.getTargetLockPointIndexList(), this.targetLockPointIndexList)
-                        .build();
+        ClientGadgetInfoOuterClass.ClientGadgetInfo.Builder clientGadgetBuilder =
+				ClientGadgetInfoOuterClass.ClientGadgetInfo.newBuilder()
+						.setCampId(this.getCampId())
+						.setCampType(this.getCampType())
+						.setGuid(this.getGuid())
+						.setOwnerEntityId(this.getOwnerEntityId())
+						.setTargetEntityId(this.getTargetEntityId())
+						.setAsyncLoad(this.isAsyncLoad())
+						.setIsPeerIdFromPlayer(this.isPeerIdFromPlayer());
+
+		if (this.getTargetEntityId() > 0) {
+			clientGadgetBuilder.addTargetEntityIdList(this.getTargetEntityId());
+		}
+
+		ClientGadgetInfoOuterClass.ClientGadgetInfo clientGadget = clientGadgetBuilder.build();
 
         SceneGadgetInfo.Builder gadgetInfo =
                 SceneGadgetInfo.newBuilder()
