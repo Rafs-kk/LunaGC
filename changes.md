@@ -84,6 +84,17 @@
 * Resets weather back to the default profile when the player leaves Dragonspine.
 * Applies Dragonspine fallback weather immediately after entering/spawning in the scene to reduce brief default-weather flicker after teleporting.
 * Keeps Dragonspine and Seirai regional weather fallbacks from overwriting each other when teleporting between both regions.
+* Fixed Oceanid’s arena platforms starting submerged by preventing the platform route gadgets from auto-starting in the resource script.
+* Disabled the broken Oceanid starter/worktop path so it no longer leaves the arena in a half-started state.
+* Added a Java-side fallback Oceanid encounter for scene 3 group 133102769.
+* Force-spawns the visible Oceanid body as a virtual-HP boss.
+* Oceanid body no longer takes lethal direct damage; virtual HP is reduced by clearing mimic waves.
+* Added randomized Oceanid mimic waves for the fallback encounter.
+* Cleans up stale mimics, duplicate Oceanid bodies, and broken controller gadgets before/during the fallback fight.
+* Resets/recreates Oceanid platforms during the fallback flow to prevent unexpected platform submersion.
+* Spawns Oceanid’s Trounce Blossom after the fallback encounter is completed.
+* Resets Oceanid weather back to default after defeat and prevents immediate boss respawn until the player leaves the arena reset radius.
+* Added missing ScriptLib compatibility support used by Oceanid-related script paths.
 
 # Tested:
 
@@ -157,6 +168,13 @@
 * Teleporting from Dragonspine to Seirai still allows Seirai's regional weather fallback to apply correctly.
 * Teleporting from Seirai to Dragonspine still allows Dragonspine's regional weather fallback to apply correctly.
 * Teleporting out of Dragonspine resets weather back to default.
+* Oceanid arena platforms no longer starts permanently submerged.
+* Oceanid weather (ID 2021) applies near the arena and resets after defeat.
+* Confirmed the visible Oceanid body spawns for the fallback encounter.
+* direct attacks do not prematurely kill, damage or duplicate the Oceanid body.
+* Confirmed randomized mimic waves spawn and progress the fallback fight.
+* Clearing all fallback waves defeats Oceanid and spawns the Trounce Blossom.
+* Confirmed the fight does not immediately restart while the reward blossom is active.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
