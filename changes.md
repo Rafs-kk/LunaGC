@@ -70,13 +70,20 @@
 * Applies lower Amakumo Peak, Seiraimaru/Koseki Village, initial Seirai Island, and Asase Shrine weather based on player position.
 * Resets weather to default when leaving Seirai weather fallback zones or leaving scene 3.
 * Applies Seirai fallback weather immediately after entering/spawning to reduce brief default-weather flicker after teleporting.
-* Removes unsafe setTargetEntityIdList(index, value)
-* Removes unsafe setTargetLockPointIndexList(index, value)
-* Uses addTargetEntityIdList(...) only if targetEntityId > 0
-* Removes unsafe ownerEntity null fallback
-* Guard null/empty dropVecList
-* Fix worldLevel bounds check
-* Skip invalid blossom preview entries instead of crashing notifyIcon()
+* Removes unsafe setTargetEntityIdList(index, value).
+* Removes unsafe setTargetLockPointIndexList(index, value).
+* Uses addTargetEntityIdList(...) only if targetEntityId > 0.
+* Removes unsafe ownerEntity null fallback.
+* Guard null/empty dropVecList.
+* Fix worldLevel bounds check.
+* Skip invalid blossom preview entries instead of crashing notifyIcon().
+* Added a Dragonspine regional weather fallback in Scene.java.
+* Applies Dragonspine's general snowy weather profile around the main Dragonspine region.
+* Adds a dedicated Cryo Hypostasis weather zone using the Snow Mountain boss weather profile.
+* Prevents Dragonspine weather from leaking into nearby Mondstadt and Liyue areas.
+* Resets weather back to the default profile when the player leaves Dragonspine.
+* Applies Dragonspine fallback weather immediately after entering/spawning in the scene to reduce brief default-weather flicker after teleporting.
+* Keeps Dragonspine and Seirai regional weather fallbacks from overwriting each other when teleporting between both regions.
 
 # Tested:
 
@@ -139,6 +146,17 @@
 * Initial Seirai Island / Slumbering Court side uses the intended local weather.
 * Asase Shrine uses its calmer local weather.
 * Teleporting away from Seirai resets weather back to default.
+* Dragonspine Statue of The Seven area applies the snowy Dragonspine weather correctly.
+* Peak of Vindagnyr / Skyfrost Nail side applies the snowy Dragonspine weather correctly.
+* Snow-Covered Path and Frostbearing Tree areas apply the snowy Dragonspine weather correctly.
+* Dragonspine outskirts and Liyue-side Dragonspine waypoints apply the snowy Dragonspine weather correctly.
+* Nearby non-Dragonspine areas in Mondstadt and Liyue reset back to default weather.
+* Forsaken Rift, Ridge Watch, Sal Terrae-side areas, and Hidden Palace of Lianshan Formula remain outside the Dragonspine weather fallback.
+* Cryo Hypostasis area uses the dedicated Snow Mountain boss weather profile.
+* Cryo Hypostasis still spawns with the dedicated boss weather profile active.
+* Teleporting from Dragonspine to Seirai still allows Seirai's regional weather fallback to apply correctly.
+* Teleporting from Seirai to Dragonspine still allows Dragonspine's regional weather fallback to apply correctly.
+* Teleporting out of Dragonspine resets weather back to default.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
