@@ -1085,6 +1085,50 @@ public class SceneScriptManager {
 
         return entity;
     }
+	
+	public EntityMonster createMonsterByConfigIdByPos(SceneGroup group, int configId, Position pos, Position rot) {
+		if (group == null) {
+			Grasscutter.getLogger().warn("CreateMonsterByConfigIdByPos called with null group");
+			return null;
+		}
+
+		SceneMonster monster = group.monsters.get(configId);
+		if (monster == null) {
+			Grasscutter.getLogger().warn(
+					"CreateMonsterByConfigIdByPos could not find monster config {} in group {}",
+					configId,
+					group.id
+			);
+			return null;
+		}
+
+		var data = GameData.getMonsterDataMap().get(monster.monster_id);
+		if (data == null) {
+			Grasscutter.getLogger().warn(
+					"CreateMonsterByConfigIdByPos could not find MonsterData for monsterId {} in group {}, config {}",
+					monster.monster_id,
+					group.id,
+					configId
+			);
+			return null;
+		}
+
+		Position spawnPos = pos != null ? pos : monster.pos;
+		Position spawnRot = rot != null ? rot : monster.rot;
+
+		int level = getScene().getLevelForMonster(monster.config_id, monster.level);
+
+		EntityMonster entity = new EntityMonster(getScene(), data, spawnPos, spawnRot, level);
+		entity.setGroupId(group.id);
+		entity.setBlockId(group.block_id);
+		entity.setConfigId(monster.config_id);
+		entity.setPoseId(monster.pose_id);
+		entity.setMetaMonster(monster);
+
+		this.scriptMonsterSpawnService.onMonsterCreatedListener.forEach(action -> action.onNotify(entity));
+
+		return entity;
+	}
 
     public void addEntity(GameEntity gameEntity) {
         getScene().addEntity(gameEntity);

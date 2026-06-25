@@ -215,7 +215,82 @@ public class Scene {
 	private static final float DRAGONSPINE_NORTH_LIYUE_PASS_RADIUS = 90.0f;
 	private static final float DRAGONSPINE_CRYO_HYPOSTASIS_EXCLUSION_RADIUS = 145.0f;
 	
+	private static final int OCEANID_SCENE_ID = 3;
+	private static final int OCEANID_WEATHER_DEFAULT = 0;
+	private static final int OCEANID_WEATHER_ID = 2021;
+	private static final Position OCEANID_ARENA_POS = new Position(1788.556f, 200.550f, 277.001f);
+	private static final float OCEANID_WEATHER_RADIUS = 75.0f;
 
+	private final Map<Integer, Integer> oceanidFallbackWeatherByUid = new ConcurrentHashMap<>();
+
+	private static final Set<Integer> OCEANID_FALLBACK_MIMIC_CONFIGS = Set.of(
+			769012, 769013, 769014,
+			769015, 769016, 769017, 769018, 769019, 769020,
+			769021, 769022, 769023,
+			769024, 769025,
+			769031, 769032, 769033,
+			769034, 769035, 769036, 769037, 769038, 769039,
+			769040, 769041, 769042,
+			769043, 769044
+	);
+
+	private static final int[][] OCEANID_FALLBACK_WAVES = {
+			// Wave 1: light opener
+			{769012, 769015},
+
+			// Wave 2: medium wave
+			{769013, 769016, 769021},
+
+			// Wave 3: final wave
+			{769018, 769019, 769024}
+	};
+	
+	private static final int OCEANID_GROUP_ID = 133102769;
+	private static final int OCEANID_BOSS_CONFIG_ID = 769026;
+	private static final int OCEANID_BLOSSOM_CONFIG_ID = 769054;
+
+	private static final float OCEANID_ENCOUNTER_RADIUS = 78.0f;
+	private static final float OCEANID_ENCOUNTER_RESET_RADIUS = 135.0f;
+	private static final float OCEANID_FALLBACK_MIN_DISPLAY_HP_RATIO = 0.08f;
+
+	private static final int OCEANID_FALLBACK_WAVE_COUNT = 3;
+	private static final int OCEANID_MIMICS_PER_WAVE = 5;
+
+	private static final List<Integer> OCEANID_PLATFORM_CONFIGS = List.of(
+			769001, 769002, 769003,
+			769004, 769005, 769006,
+			769007, 769008, 769009
+	);
+
+	private static final Set<Integer> OCEANID_CONTROL_GADGET_CONFIGS = Set.of(
+			769010, // HP checker
+			769011, 769045, 769046, 769047, // boss/operator gadgets
+			769055, // anchor
+			769062, 769063, 769064, 769065 // old starter worktop gadgets
+	);
+
+	private static final List<Integer> OCEANID_FALLBACK_MIMIC_POOL = List.of(
+			769012, 769013, 769014,
+			769015, 769016, 769017, 769018, 769019, 769020,
+			769021, 769022, 769023,
+			769024, 769025,
+			769031, 769032, 769033,
+			769034, 769035, 769036, 769037, 769038, 769039,
+			769040, 769041, 769042,
+			769043, 769044
+	);
+	
+	private int oceanidFallbackBossEntityId = 0;
+	private int oceanidFallbackWaveIndex = 0;
+	private boolean oceanidFallbackEncounterActive = false;
+	private boolean oceanidFallbackWaitingForLeave = false;
+	private boolean oceanidFallbackDefeatedUntilLeave = false;
+	private boolean oceanidFallbackFinishing = false;
+	private long oceanidFallbackLastStartMs = 0L;
+
+	private final Map<Integer, Float> oceanidFallbackVirtualHp = new ConcurrentHashMap<>();
+	private final Map<Integer, Float> oceanidFallbackVirtualMaxHp = new ConcurrentHashMap<>();
+	
     @Getter private GameEntity sceneEntity;
     @Getter private final ServerTaskScheduler scheduler;
 
@@ -386,6 +461,7 @@ public class Scene {
         this.setupPlayerAvatars(player);
 		this.applySeiraiFallbackWeather(player, false);
 		this.applyDragonspineFallbackWeather(player, false);
+		this.applyOceanidFallbackWeather(player, false);
     }
 
     public synchronized void removePlayer(Player player) {
@@ -404,6 +480,10 @@ public class Scene {
 		
 		if (this.getId() == DRAGONSPINE_SCENE_ID && this.dragonspineFallbackWeatherByUid.remove(player.getUid()) != null) {
 			player.setWeather(DRAGONSPINE_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
+		}
+		
+		if (this.getId() == OCEANID_SCENE_ID && this.oceanidFallbackWeatherByUid.remove(player.getUid()) != null) {
+			player.setWeather(OCEANID_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
 		}
 		
         if (this.getChallenge() != null && this.getChallenge().inProgress()) {
@@ -498,6 +578,7 @@ public class Scene {
         this.addEntity(teamManager.getCurrentAvatarEntity());
 		this.applySeiraiFallbackWeather(player, false);
 		this.applyDragonspineFallbackWeather(player, false);
+		this.applyOceanidFallbackWeather(player, false);
 
         // Notify the client of any extra skill charges
         teamManager.getActiveTeam().stream()
@@ -722,9 +803,15 @@ public class Scene {
 				return;
 			}
 		}
-		
+
 		if (target instanceof EntityMonster monster && this.isIcewindFallbackMonster(monster)) {
 			if (this.handleIcewindSuiteVirtualDamage(monster, result.getDamage(), result.getAttackerId())) {
+				return;
+			}
+		}
+		
+		if (target instanceof EntityMonster monster && this.isAnyOceanidBody(monster)) {
+			if (this.handleOceanidFallbackBodyDamage(monster, result.getDamage(), result.getAttackerId())) {
 				return;
 			}
 		}
@@ -739,13 +826,15 @@ public class Scene {
 
     public void killEntity(GameEntity target, int attackerId) {
 		
-		
-		
         GameEntity attacker = null;
 
         if (attackerId > 0) {
             attacker = getEntityById(attackerId);
         }
+		
+		if (target instanceof EntityMonster monster && this.shouldBlockOceanidFallbackBodyKill(monster)) {
+			return;
+		}
 
         if (attacker != null) {
             // Check codex
@@ -829,12 +918,17 @@ public class Scene {
 		}
 
         // Remove entity from world
-        this.removeEntity(target);
+		this.removeEntity(target);
 
-        // Death event
-        target.onDeath(attackerId);
-        this.triggerDungeonEvent(
-                DungeonPassConditionType.DUNGEON_COND_KILL_MONSTER_COUNT, ++killedMonsterCount);
+		// Death event
+		target.onDeath(attackerId);
+
+		if (target instanceof EntityMonster monster) {
+			this.handleOceanidFallbackMonsterDeath(monster, attackerId);
+		}
+
+		this.triggerDungeonEvent(
+				DungeonPassConditionType.DUNGEON_COND_KILL_MONSTER_COUNT, ++killedMonsterCount);
     }
 
     public void onTick() {
@@ -898,6 +992,8 @@ public class Scene {
 		if (this.tickCount % 5 == 0) {
 			this.checkSeiraiFallbackWeather();
 			this.checkDragonspineFallbackWeather();
+			this.checkOceanidFallbackWeather();
+			this.checkOceanidFallbackEncounter();
 		}
 
         this.finishLoading();
@@ -2611,5 +2707,702 @@ public class Scene {
 				pos,
 				DRAGONSPINE_CRYO_HYPOSTASIS_SIDE_POS,
 				DRAGONSPINE_CRYO_HYPOSTASIS_EXCLUSION_RADIUS);
+	}
+	
+	private void checkOceanidFallbackWeather() {
+		if (this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			this.applyOceanidFallbackWeather(player, true);
+		}
+	}
+
+	private int getDesiredOceanidWeather(Position pos) {
+		if (pos == null) {
+			return OCEANID_WEATHER_DEFAULT;
+		}
+
+		// Once Oceanid is defeated and the blossom is present, keep the area sunny until the player leaves the reset radius. 
+		// Otherwise the normal position weather fallback would immediately reapply weather 2021.
+		if (this.oceanidFallbackDefeatedUntilLeave
+				|| this.oceanidFallbackWaitingForLeave
+				|| this.hasOceanidRewardBlossom()) {
+			return OCEANID_WEATHER_DEFAULT;
+		}
+
+		if (this.isNear2d(pos, OCEANID_ARENA_POS, OCEANID_WEATHER_RADIUS)) {
+			return OCEANID_WEATHER_ID;
+		}
+
+		return OCEANID_WEATHER_DEFAULT;
+	}
+
+	private void applyOceanidFallbackWeather(Player player, boolean allowDefaultReset) {
+		if (player == null || this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		Position pos = player.getPosition();
+		int desiredWeather = this.getDesiredOceanidWeather(pos);
+		int uid = player.getUid();
+
+		boolean hadOceanidWeather = this.oceanidFallbackWeatherByUid.containsKey(uid);
+		int previousWeather = this.oceanidFallbackWeatherByUid.getOrDefault(uid, OCEANID_WEATHER_DEFAULT);
+
+		if (desiredWeather == OCEANID_WEATHER_DEFAULT) {
+			boolean seiraiOwnsWeather =
+					this.getDesiredSeiraiWeather(pos) != SEIRAI_WEATHER_DEFAULT;
+			boolean dragonspineOwnsWeather =
+					this.getDesiredDragonspineWeather(pos) != DRAGONSPINE_WEATHER_DEFAULT;
+
+			if (hadOceanidWeather && (seiraiOwnsWeather || dragonspineOwnsWeather)) {
+				this.oceanidFallbackWeatherByUid.remove(uid);
+				return;
+			}
+
+			if (allowDefaultReset && hadOceanidWeather) {
+				player.setWeather(OCEANID_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
+				this.oceanidFallbackWeatherByUid.remove(uid);
+			}
+
+			return;
+		}
+
+		if (!hadOceanidWeather || previousWeather != desiredWeather) {
+			player.setWeather(desiredWeather, ClimateType.CLIMATE_SUNNY);
+			this.oceanidFallbackWeatherByUid.put(uid, desiredWeather);
+		}
+	}
+
+	private boolean hasActiveOceanidFallbackEncounter() {
+		EntityMonster body = this.getOceanidFallbackBody();
+		return body != null && body.isAlive();
+	}
+	
+	private void checkOceanidFallbackEncounter() {
+		if (this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		boolean playerNearArena =
+				this.getPlayers().stream()
+						.anyMatch(player ->
+								player != null
+										&& player.getPosition() != null
+										&& this.isNear2d(
+												player.getPosition(),
+												OCEANID_ARENA_POS,
+												OCEANID_ENCOUNTER_RADIUS));
+
+		boolean playerStillInResetArea =
+				this.getPlayers().stream()
+						.anyMatch(player ->
+								player != null
+										&& player.getPosition() != null
+										&& this.isNear2d(
+												player.getPosition(),
+												OCEANID_ARENA_POS,
+												OCEANID_ENCOUNTER_RESET_RADIUS));
+
+		if (!playerStillInResetArea) {
+			this.oceanidFallbackWaitingForLeave = false;
+			this.oceanidFallbackDefeatedUntilLeave = false;
+
+			if (this.oceanidFallbackEncounterActive) {
+				this.cleanupOceanidFallbackEncounter(false);
+			}
+
+			return;
+		}
+
+		if (this.hasOceanidRewardBlossom()
+				|| this.oceanidFallbackWaitingForLeave
+				|| this.oceanidFallbackDefeatedUntilLeave) {
+			this.oceanidFallbackWaitingForLeave = true;
+			this.oceanidFallbackDefeatedUntilLeave = true;
+			this.cleanupOceanidPostDefeatOrphans();
+			this.resetOceanidFallbackWeather();
+			return;
+		}
+
+		if (this.oceanidFallbackEncounterActive) {
+			this.cleanupDuplicateOceanidBodies();
+			return;
+		}
+
+		if (!playerNearArena) {
+			return;
+		}
+
+		long now = System.currentTimeMillis();
+		if (now - this.oceanidFallbackLastStartMs < 5000L) {
+			return;
+		}
+
+		this.startOceanidFallbackEncounter();
+	}
+
+	private synchronized void startOceanidFallbackEncounter() {
+		if (this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		if (this.oceanidFallbackEncounterActive
+				|| this.oceanidFallbackWaitingForLeave
+				|| this.oceanidFallbackDefeatedUntilLeave
+				|| this.hasOceanidRewardBlossom()) {
+			return;
+		}
+
+		this.oceanidFallbackEncounterActive = true;
+		this.oceanidFallbackFinishing = false;
+		this.oceanidFallbackLastStartMs = System.currentTimeMillis();
+
+		var group = this.getScriptManager().getGroupById(OCEANID_GROUP_ID);
+		if (group == null) {
+			this.oceanidFallbackEncounterActive = false;
+			Grasscutter.getLogger().warn("[OceanidFallback] Could not load Oceanid group {}", OCEANID_GROUP_ID);
+			return;
+		}
+
+		this.cleanupOceanidRuntimeEntitiesBeforeStart();
+		this.resetOceanidFallbackPlatforms(group);
+
+		EntityMonster body = this.spawnOceanidFallbackBody(group);
+		if (body == null) {
+			this.oceanidFallbackEncounterActive = false;
+			Grasscutter.getLogger().warn("[OceanidFallback] Could not spawn Oceanid body config {}", OCEANID_BOSS_CONFIG_ID);
+			return;
+		}
+
+		this.oceanidFallbackBossEntityId = body.getId();
+		this.oceanidFallbackWaveIndex = 0;
+
+		float maxHp = body.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		if (maxHp <= 0f) {
+			maxHp = 1f;
+		}
+
+		this.oceanidFallbackVirtualMaxHp.put(body.getId(), maxHp);
+		this.oceanidFallbackVirtualHp.put(body.getId(), maxHp);
+		this.setOceanidFallbackDisplayedHp(body);
+
+		this.spawnOceanidFallbackWave(0);
+
+		Grasscutter.getLogger()
+				.info(
+						"[OceanidFallback] Started visible Oceanid fallback: bossEntityId={}, virtualHp={}, wave=1/{}",
+						body.getId(),
+						maxHp,
+						OCEANID_FALLBACK_WAVE_COUNT);
+	}
+
+	private EntityMonster spawnOceanidFallbackBody(SceneGroup group) {
+		if (group == null) {
+			return null;
+		}
+
+		Position bodyPos = OCEANID_ARENA_POS.clone();
+		Position bodyRot = new Position(0f, 180f, 0f);
+
+		EntityMonster body =
+				this.getScriptManager()
+						.createMonsterByConfigIdByPos(group, OCEANID_BOSS_CONFIG_ID, bodyPos, bodyRot);
+
+		if (body == null) {
+			return null;
+		}
+
+		this.addEntity(body);
+		return body;
+	}
+
+	private void spawnOceanidFallbackWave(int waveIndex) {
+		if (this.getId() != OCEANID_SCENE_ID || !this.oceanidFallbackEncounterActive) {
+			return;
+		}
+
+		if (waveIndex < 0 || waveIndex >= OCEANID_FALLBACK_WAVE_COUNT) {
+			this.finishOceanidFallbackEncounter(0);
+			return;
+		}
+
+		var group = this.getScriptManager().getGroupById(OCEANID_GROUP_ID);
+		if (group == null) {
+			Grasscutter.getLogger().warn("[OceanidFallback] Could not load Oceanid group for wave {}", waveIndex + 1);
+			this.finishOceanidFallbackEncounter(0);
+			return;
+		}
+
+		this.removeOceanidFallbackMimics();
+		this.resetOceanidFallbackPlatforms(group);
+		this.cleanupDuplicateOceanidBodies();
+
+		List<Integer> waveConfigs = this.chooseRandomOceanidFallbackWaveConfigs();
+
+		int spawned = 0;
+
+		for (int configId : waveConfigs) {
+			var metaMonster = group.monsters.get(configId);
+			if (metaMonster == null) {
+				Grasscutter.getLogger()
+						.warn(
+								"[OceanidFallback] Missing mimic config {} in group {}",
+								configId,
+								OCEANID_GROUP_ID);
+				continue;
+			}
+
+			EntityMonster mimic = this.getScriptManager().createMonster(group.id, group.block_id, metaMonster);
+			if (mimic == null) {
+				Grasscutter.getLogger().warn("[OceanidFallback] Failed to create mimic config {}", configId);
+				continue;
+			}
+
+			this.addEntity(mimic);
+			spawned++;
+		}
+
+		Grasscutter.getLogger()
+				.info(
+						"[OceanidFallback] Spawned random wave {}/{} with {} mimic(s): {}",
+						waveIndex + 1,
+						OCEANID_FALLBACK_WAVE_COUNT,
+						spawned,
+						waveConfigs);
+
+		if (spawned <= 0) {
+			this.advanceOceanidFallbackWave(0);
+		}
+	}
+
+	private List<Integer> chooseRandomOceanidFallbackWaveConfigs() {
+		List<Integer> pool = new ArrayList<>(OCEANID_FALLBACK_MIMIC_POOL);
+		Collections.shuffle(pool, new Random(System.nanoTime() + this.tickCount));
+
+		int count = Math.min(OCEANID_MIMICS_PER_WAVE, pool.size());
+		return new ArrayList<>(pool.subList(0, count));
+	}
+
+	private void handleOceanidFallbackMonsterDeath(EntityMonster monster, int attackerId) {
+		if (monster == null) {
+			return;
+		}
+
+		if (this.isAnyOceanidBody(monster)) {
+			// The Oceanid body should never progress by normal death while fallback is active.
+			// finishOceanidFallbackEncounter removes it directly when virtual HP reaches 0.
+			if (this.oceanidFallbackEncounterActive && !this.oceanidFallbackFinishing) {
+				this.shouldBlockOceanidFallbackBodyKill(monster);
+			}
+			return;
+		}
+
+		if (!this.isOceanidFallbackMimic(monster)) {
+			return;
+		}
+
+		if (this.hasAliveOceanidFallbackMimic()) {
+			return;
+		}
+
+		this.advanceOceanidFallbackWave(attackerId);
+	}
+
+	private void advanceOceanidFallbackWave(int attackerId) {
+		if (!this.oceanidFallbackEncounterActive) {
+			return;
+		}
+
+		EntityMonster body = this.getOceanidFallbackBody();
+
+		if (body == null || !body.isAlive()) {
+			Grasscutter.getLogger().warn("[OceanidFallback] Missing body during wave advance; finishing encounter");
+			this.finishOceanidFallbackEncounter(attackerId);
+			return;
+		}
+
+		float maxHp =
+				this.oceanidFallbackVirtualMaxHp.getOrDefault(
+						body.getId(),
+						body.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP));
+
+		if (maxHp <= 0f) {
+			maxHp = 1f;
+		}
+
+		float currentHp = this.oceanidFallbackVirtualHp.getOrDefault(body.getId(), maxHp);
+		float waveDamage = maxHp / OCEANID_FALLBACK_WAVE_COUNT;
+		float newHp = Math.max(0f, currentHp - waveDamage);
+
+		this.oceanidFallbackVirtualMaxHp.put(body.getId(), maxHp);
+		this.oceanidFallbackVirtualHp.put(body.getId(), newHp);
+
+		Grasscutter.getLogger()
+				.info(
+						"[OceanidFallback] Wave {}/{} cleared, Oceanid virtual HP {}/{}",
+						this.oceanidFallbackWaveIndex + 1,
+						OCEANID_FALLBACK_WAVE_COUNT,
+						newHp,
+						maxHp);
+
+		if (newHp <= 0f || this.oceanidFallbackWaveIndex + 1 >= OCEANID_FALLBACK_WAVE_COUNT) {
+			this.finishOceanidFallbackEncounter(attackerId);
+			return;
+		}
+
+		this.setOceanidFallbackDisplayedHp(body);
+
+		this.oceanidFallbackWaveIndex++;
+		this.spawnOceanidFallbackWave(this.oceanidFallbackWaveIndex);
+	}
+
+	private boolean handleOceanidFallbackBodyDamage(EntityMonster body, float amount, int attackerId) {
+		if (body == null || !this.isAnyOceanidBody(body)) {
+			return false;
+		}
+
+		if (!this.oceanidFallbackEncounterActive || this.oceanidFallbackFinishing) {
+			return false;
+		}
+
+		if (!this.isOceanidFallbackBody(body)) {
+			// Duplicate/orphan body. Remove it and consume the attack.
+			this.removeEntity(body, VisionType.VISION_TYPE_REMOVE);
+			Grasscutter.getLogger()
+					.warn(
+							"[OceanidFallback] Removed duplicate Oceanid body entityId={}, config={}",
+							body.getId(),
+							body.getConfigId());
+			return true;
+		}
+
+		// Direct attacks should not damage Oceanid in this fallback.
+		// Only clearing mimic waves reduces virtual HP.
+		this.setOceanidFallbackDisplayedHp(body);
+		return true;
+	}
+
+	private boolean shouldBlockOceanidFallbackBodyKill(EntityMonster body) {
+		if (body == null || !this.isAnyOceanidBody(body)) {
+			return false;
+		}
+
+		if (!this.oceanidFallbackEncounterActive || this.oceanidFallbackFinishing) {
+			return false;
+		}
+
+		if (!this.isOceanidFallbackBody(body)) {
+			this.removeEntity(body, VisionType.VISION_TYPE_REMOVE);
+			Grasscutter.getLogger()
+					.warn(
+							"[OceanidFallback] Removed duplicate Oceanid body kill attempt entityId={}",
+							body.getId());
+			return true;
+		}
+
+		this.setOceanidFallbackDisplayedHp(body);
+
+		Grasscutter.getLogger()
+				.debug(
+						"[OceanidFallback] Blocked direct Oceanid body kill attempt entityId={}",
+						body.getId());
+
+		return true;
+	}
+
+	private void setOceanidFallbackDisplayedHp(EntityMonster body) {
+		if (body == null || !this.isOceanidFallbackBody(body)) {
+			return;
+		}
+
+		float maxHp = body.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+		if (maxHp <= 0f) {
+			return;
+		}
+
+		float virtualMaxHp = this.oceanidFallbackVirtualMaxHp.getOrDefault(body.getId(), maxHp);
+		float virtualHp = this.oceanidFallbackVirtualHp.getOrDefault(body.getId(), virtualMaxHp);
+
+		if (virtualMaxHp <= 0f) {
+			return;
+		}
+
+		float virtualRatio = Math.max(0f, Math.min(1f, virtualHp / virtualMaxHp));
+
+		float displayRatio =
+				OCEANID_FALLBACK_MIN_DISPLAY_HP_RATIO
+						+ ((1f - OCEANID_FALLBACK_MIN_DISPLAY_HP_RATIO) * virtualRatio);
+
+		displayRatio = Math.max(OCEANID_FALLBACK_MIN_DISPLAY_HP_RATIO, displayRatio);
+
+		body.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, maxHp * displayRatio);
+		this.broadcastPacket(new PacketEntityFightPropUpdateNotify(body, FightProperty.FIGHT_PROP_CUR_HP));
+	}
+
+	private void finishOceanidFallbackEncounter(int attackerId) {
+		if (this.oceanidFallbackFinishing) {
+			return;
+		}
+
+		this.oceanidFallbackFinishing = true;
+
+		EntityMonster body = this.getOceanidFallbackBody();
+
+		if (body != null) {
+			body.setFightProperty(FightProperty.FIGHT_PROP_CUR_HP, 0f);
+			this.broadcastPacket(new PacketEntityFightPropUpdateNotify(body, FightProperty.FIGHT_PROP_CUR_HP));
+
+			this.removeEntity(body, VisionType.VISION_TYPE_DIE);
+
+			this.oceanidFallbackVirtualHp.remove(body.getId());
+			this.oceanidFallbackVirtualMaxHp.remove(body.getId());
+		}
+
+		this.oceanidFallbackBossEntityId = 0;
+		this.oceanidFallbackWaveIndex = 0;
+
+		this.removeOceanidFallbackMimics();
+		this.cleanupOceanidControlEntities();
+
+		this.oceanidFallbackEncounterActive = false;
+		this.oceanidFallbackWaitingForLeave = true;
+		this.oceanidFallbackDefeatedUntilLeave = true;
+
+		this.spawnOceanidFallbackRewardBlossom();
+		this.cleanupOceanidPostDefeatOrphans();
+		this.resetOceanidFallbackWeather();
+
+		this.oceanidFallbackFinishing = false;
+
+		Grasscutter.getLogger().info("[OceanidFallback] Finished visible Oceanid fallback encounter");
+	}
+
+	private void spawnOceanidFallbackRewardBlossom() {
+		if (this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		this.oceanidFallbackWaitingForLeave = true;
+		this.oceanidFallbackDefeatedUntilLeave = true;
+
+		if (this.hasOceanidRewardBlossom()) {
+			this.resetOceanidFallbackWeather();
+			return;
+		}
+
+		var group = this.getScriptManager().getGroupById(OCEANID_GROUP_ID);
+		if (group == null) {
+			Grasscutter.getLogger().warn("[OceanidFallback] Could not load Oceanid group for reward blossom");
+			return;
+		}
+
+		var blossomMeta = group.gadgets.get(OCEANID_BLOSSOM_CONFIG_ID);
+		if (blossomMeta == null) {
+			Grasscutter.getLogger()
+					.warn(
+							"[OceanidFallback] Missing Oceanid reward blossom config {}",
+							OCEANID_BLOSSOM_CONFIG_ID);
+			return;
+		}
+
+		EntityGadget blossom = this.getScriptManager().createGadget(group.id, group.block_id, blossomMeta);
+		if (blossom == null) {
+			Grasscutter.getLogger().warn("[OceanidFallback] Failed to create Oceanid reward blossom");
+			return;
+		}
+
+		this.addEntity(blossom);
+		this.resetOceanidFallbackWeather();
+
+		Grasscutter.getLogger().info("[OceanidFallback] Spawned Oceanid reward blossom");
+	}
+	
+	private void cleanupOceanidRuntimeEntitiesBeforeStart() {
+		this.removeOceanidFallbackMimics();
+		this.removeOceanidEntityByConfigId(OCEANID_BOSS_CONFIG_ID);
+		this.cleanupOceanidControlEntities();
+
+		this.oceanidFallbackBossEntityId = 0;
+		this.oceanidFallbackWaveIndex = 0;
+		this.oceanidFallbackVirtualHp.clear();
+		this.oceanidFallbackVirtualMaxHp.clear();
+	}
+
+	private void cleanupOceanidFallbackEncounter(boolean removeBlossom) {
+		EntityMonster body = this.getOceanidFallbackBody();
+		if (body != null) {
+			this.removeEntity(body, VisionType.VISION_TYPE_REMOVE);
+			this.oceanidFallbackVirtualHp.remove(body.getId());
+			this.oceanidFallbackVirtualMaxHp.remove(body.getId());
+		}
+
+		this.oceanidFallbackEncounterActive = false;
+		this.oceanidFallbackFinishing = false;
+		this.oceanidFallbackBossEntityId = 0;
+		this.oceanidFallbackWaveIndex = 0;
+
+		this.removeOceanidFallbackMimics();
+		this.removeOceanidEntityByConfigId(OCEANID_BOSS_CONFIG_ID);
+		this.cleanupOceanidControlEntities();
+
+		if (removeBlossom) {
+			this.removeOceanidEntityByConfigId(OCEANID_BLOSSOM_CONFIG_ID);
+		}
+	}
+
+	private void cleanupOceanidPostDefeatOrphans() {
+		this.removeOceanidFallbackMimics();
+
+		this.removeOceanidEntityByConfigId(OCEANID_BOSS_CONFIG_ID);
+		this.cleanupOceanidControlEntities();
+
+		this.oceanidFallbackEncounterActive = false;
+		this.oceanidFallbackFinishing = false;
+		this.oceanidFallbackBossEntityId = 0;
+		this.oceanidFallbackWaveIndex = 0;
+		this.oceanidFallbackVirtualHp.clear();
+		this.oceanidFallbackVirtualMaxHp.clear();
+	}
+
+	private void cleanupOceanidControlEntities() {
+		for (int configId : OCEANID_CONTROL_GADGET_CONFIGS) {
+			this.removeOceanidEntityByConfigId(configId);
+		}
+	}
+
+	private void cleanupDuplicateOceanidBodies() {
+		EntityMonster trackedBody = this.getOceanidFallbackBody();
+
+		List<GameEntity> duplicates =
+				this.getEntities().values().stream()
+						.filter(entity ->
+								entity instanceof EntityMonster monster
+										&& this.isAnyOceanidBody(monster)
+										&& (trackedBody == null || monster.getId() != trackedBody.getId()))
+						.toList();
+
+		for (GameEntity duplicate : duplicates) {
+			this.removeEntity(duplicate, VisionType.VISION_TYPE_REMOVE);
+		}
+
+		if (!duplicates.isEmpty()) {
+			Grasscutter.getLogger()
+					.warn("[OceanidFallback] Removed {} duplicate Oceanid body/bodies", duplicates.size());
+		}
+	}
+
+	private void removeOceanidFallbackMimics() {
+		List<GameEntity> toRemove =
+				this.getEntities().values().stream()
+						.filter(entity ->
+								entity instanceof EntityMonster monster
+										&& monster.getGroupId() == OCEANID_GROUP_ID
+										&& OCEANID_FALLBACK_MIMIC_CONFIGS.contains(monster.getConfigId()))
+						.toList();
+
+		if (!toRemove.isEmpty()) {
+			this.removeEntities(toRemove, VisionType.VISION_TYPE_REMOVE);
+		}
+	}
+
+	private void resetOceanidFallbackPlatforms(SceneGroup group) {
+		if (group == null || group.gadgets == null) {
+			return;
+		}
+
+		for (int configId : OCEANID_PLATFORM_CONFIGS) {
+			this.removeOceanidEntityByConfigId(configId);
+
+			var metaGadget = group.gadgets.get(configId);
+			if (metaGadget == null) {
+				continue;
+			}
+
+			EntityGadget platform = this.getScriptManager().createGadget(group.id, group.block_id, metaGadget);
+			if (platform == null) {
+				continue;
+			}
+
+			this.addEntity(platform);
+			platform.updateState(0);
+		}
+
+		Grasscutter.getLogger().debug("[OceanidFallback] Reset Oceanid platforms");
+	}
+
+	private void removeOceanidEntityByConfigId(int configId) {
+		List<GameEntity> toRemove =
+				this.getEntities().values().stream()
+						.filter(entity ->
+								entity != null
+										&& entity.getGroupId() == OCEANID_GROUP_ID
+										&& entity.getConfigId() == configId)
+						.toList();
+
+		for (GameEntity entity : toRemove) {
+			this.removeEntity(entity, VisionType.VISION_TYPE_REMOVE);
+		}
+	}
+	
+	private boolean isAnyOceanidBody(EntityMonster monster) {
+		return this.getId() == OCEANID_SCENE_ID
+				&& monster != null
+				&& monster.getGroupId() == OCEANID_GROUP_ID
+				&& monster.getConfigId() == OCEANID_BOSS_CONFIG_ID;
+	}
+
+	private boolean isOceanidFallbackBody(EntityMonster monster) {
+		return this.isAnyOceanidBody(monster)
+				&& this.oceanidFallbackBossEntityId > 0
+				&& monster.getId() == this.oceanidFallbackBossEntityId;
+	}
+
+	private EntityMonster getOceanidFallbackBody() {
+		if (this.oceanidFallbackBossEntityId <= 0) {
+			return null;
+		}
+
+		GameEntity entity = this.getEntityById(this.oceanidFallbackBossEntityId);
+		if (entity instanceof EntityMonster monster && this.isOceanidFallbackBody(monster)) {
+			return monster;
+		}
+
+		return null;
+	}
+
+	private boolean isOceanidFallbackMimic(EntityMonster monster) {
+		return this.getId() == OCEANID_SCENE_ID
+				&& this.oceanidFallbackEncounterActive
+				&& monster != null
+				&& monster.getGroupId() == OCEANID_GROUP_ID
+				&& OCEANID_FALLBACK_MIMIC_CONFIGS.contains(monster.getConfigId());
+	}
+
+	private boolean hasAliveOceanidFallbackMimic() {
+		return this.getEntities().values().stream()
+				.anyMatch(entity ->
+						entity instanceof EntityMonster monster
+								&& this.isOceanidFallbackMimic(monster)
+								&& monster.isAlive());
+	}
+
+	private boolean hasOceanidRewardBlossom() {
+		return this.getEntityByConfigId(OCEANID_BLOSSOM_CONFIG_ID, OCEANID_GROUP_ID) instanceof EntityGadget;
+	}
+
+	private void resetOceanidFallbackWeather() {
+		if (this.getId() != OCEANID_SCENE_ID) {
+			return;
+		}
+
+		for (Player player : this.getPlayers()) {
+			if (player != null) {
+				player.setWeather(OCEANID_WEATHER_DEFAULT, ClimateType.CLIMATE_SUNNY);
+				this.oceanidFallbackWeatherByUid.remove(player.getUid());
+			}
+		}
 	}
 }

@@ -66,6 +66,20 @@ public class ScriptLib {
         sb.append("}");
         return sb.toString();
     }
+	
+	private int resolveScriptGroupId(int groupId) {
+		if (groupId != 0) {
+			return groupId;
+		}
+
+		var group = this.currentGroup.getIfExists();
+		if (group == null) {
+			logger.warn("[LUA] Could not resolve groupId 0 because there is no current Lua group");
+			return 0;
+		}
+
+		return group.id;
+	}
 
     public void setCurrentGroup(SceneGroup currentGroup) {
         this.currentGroup.set(currentGroup);
@@ -254,20 +268,31 @@ public class ScriptLib {
     // TODO: AddExtraFlowSuite
 
     public int AddExtraGroupSuite(int groupId, int suite) {
-        logger.debug("[LUA] Call AddExtraGroupSuite with {},{}", groupId, suite);
-        SceneGroup group = getSceneScriptManager().getGroupById(groupId);
-        SceneGroupInstance groupInstance = getSceneScriptManager().getGroupInstanceById(groupId);
-        if (group == null || groupInstance == null || group.monsters == null) {
-            return 1;
-        }
-        var suiteData = group.getSuiteByIndex(suite);
-        if (suiteData == null) {
-            Grasscutter.getLogger().warn("trying to get suite that doesn't exist: {} {}", groupId, suite);
-            return 1;
-        }
-        this.getSceneScriptManager().addGroupSuite(groupInstance, suiteData);
-        return 0;
-    }
+		int resolvedGroupId = resolveScriptGroupId(groupId);
+		logger.debug("[LUA] Call AddExtraGroupSuite with {},{} resolvedGroupId={}", groupId, suite, resolvedGroupId);
+
+		if (resolvedGroupId == 0) {
+			return 1;
+		}
+
+		SceneGroup group = getSceneScriptManager().getGroupById(resolvedGroupId);
+		SceneGroupInstance groupInstance = getSceneScriptManager().getGroupInstanceById(resolvedGroupId);
+
+		if (group == null || groupInstance == null || group.monsters == null) {
+			logger.warn("[LUA] AddExtraGroupSuite failed: group={}, resolvedGroupId={}, suite={}",
+					groupId, resolvedGroupId, suite);
+			return 1;
+		}
+
+		var suiteData = group.getSuiteByIndex(suite);
+		if (suiteData == null) {
+			Grasscutter.getLogger().warn("trying to get suite that doesn't exist: {} {}", resolvedGroupId, suite);
+			return 1;
+		}
+
+		this.getSceneScriptManager().addGroupSuite(groupInstance, suiteData);
+		return 0;
+	}
 
     // TODO: AddFleurFairMultistagePlayBuffEnergy
     // TODO: AddGalleryProgressScore
@@ -581,7 +606,45 @@ public class ScriptLib {
         return 0;
     }
 
-    // TODO: CreateMonsterByConfigIdByPos
+    public int CreateMonsterByConfigIdByPos(int configId, LuaTable bornPos, LuaTable face) {
+		logger.debug("[LUA] Call CreateMonsterByConfigIdByPos with {}, {}, {}", configId, bornPos, face);
+
+		var currentGroup = this.getCurrentGroup();
+		if (currentGroup.isEmpty()) {
+			logger.warn("[LUA] CreateMonsterByConfigIdByPos failed: no current group for config {}", configId);
+			return 1;
+		}
+
+		Position pos = luaTableToPositionOrNull(bornPos);
+		Position rot = luaTableToPositionOrNull(face);
+
+		EntityMonster entity = this.getSceneScriptManager()
+				.createMonsterByConfigIdByPos(currentGroup.get(), configId, pos, rot);
+
+		if (entity == null) {
+			logger.warn(
+					"[LUA] CreateMonsterByConfigIdByPos failed for group {}, config {}",
+					currentGroup.get().id,
+					configId
+			);
+			return 2;
+		}
+
+		this.getSceneScriptManager().addEntity(entity);
+		return 0;
+	}
+
+	private Position luaTableToPositionOrNull(LuaTable table) {
+		if (table == null) {
+			return null;
+		}
+
+		return new Position(
+				table.get("x").tofloat(),
+				table.get("y").tofloat(),
+				table.get("z").tofloat()
+		);
+	}
 
     public int CreateMonsterFaceAvatar(LuaTable var1) {
         logger.warn("[LUA] Call unimplemented CreateMonsterFaceAvatar with {}", printTable(var1));
@@ -640,22 +703,29 @@ public class ScriptLib {
     }
 
     public int DelWorktopOptionByGroupId(int groupId, int configId, int option) {
-        logger.debug("[LUA] Call DelWorktopOptionByGroupId with {},{},{}", groupId, configId, option);
-        val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, groupId);
+		int resolvedGroupId = resolveScriptGroupId(groupId);
+		logger.debug("[LUA] Call DelWorktopOptionByGroupId with {},{},{} resolvedGroupId={}",
+				groupId, configId, option, resolvedGroupId);
 
-        if (!(entity instanceof EntityGadget gadget)) {
-            return 1;
-        }
+		if (resolvedGroupId == 0) {
+			return 1;
+		}
 
-        if (!(gadget.getContent() instanceof GadgetWorktop worktop)) {
-            return 1;
-        }
+		val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, resolvedGroupId);
 
-        worktop.removeWorktopOption(option);
-        getSceneScriptManager().getScene().broadcastPacket(new PacketWorktopOptionNotify(gadget));
+		if (!(entity instanceof EntityGadget gadget)) {
+			return 1;
+		}
 
-        return 0;
-    }
+		if (!(gadget.getContent() instanceof GadgetWorktop worktop)) {
+			return 1;
+		}
+
+		worktop.removeWorktopOption(option);
+		getSceneScriptManager().getScene().broadcastPacket(new PacketWorktopOptionNotify(gadget));
+
+		return 0;
+	}
 
     // TODO: DestroyIrodoriChessTower
     // TODO: DigRetractAllWidget
@@ -726,17 +796,26 @@ public class ScriptLib {
     }
 
     public LuaTable GetActivityOpenAndCloseTimeByScheduleId(int scheduleId) {
-        logger.debug("[LUA] Call GetActivityOpenAndCloseTimeByScheduleId with {}", scheduleId);
-        var result = new LuaTable();
-        var activityConfig = ActivityManager.getScheduleActivityConfigMap().get(scheduleId);
+		logger.debug("[LUA] Call GetActivityOpenAndCloseTimeByScheduleId with {}", scheduleId);
 
-        if (activityConfig != null) {
-            result.set(1, LuaValue.valueOf(activityConfig.getBeginTime().getTime()));
-            result.set(2, LuaValue.valueOf(activityConfig.getEndTime().getTime()));
-        }
+		var result = new LuaTable();
+		var activityConfig = ActivityManager.getScheduleActivityConfigMap().get(scheduleId);
 
-        return result;
-    }
+		if (activityConfig != null
+				&& activityConfig.getBeginTime() != null
+				&& activityConfig.getEndTime() != null) {
+			result.set(1, LuaValue.valueOf(activityConfig.getBeginTime().getTime()));
+			result.set(2, LuaValue.valueOf(activityConfig.getEndTime().getTime()));
+		} else {
+			// REL6.0 compatibility fallback:
+			// Many old retail Lua scripts assume this function always returns a 2-entry table. Returning an empty table makes scripts crash when they read act_time[1] or act_time[2].
+			// 0,0 means "activity not open", which is safest for old event replacement logic such as Oceanid/Rhodeia's Rage.
+			result.set(1, LuaValue.valueOf(0L));
+			result.set(2, LuaValue.valueOf(0L));
+		}
+
+		return result;
+	}
 
     // TODO: GetAranaraCollectableCountByTypeAndState
 
@@ -1016,19 +1095,29 @@ public class ScriptLib {
     // TODO: GetSceneTimeSeconds
 
     public LuaTable GetSceneUidList() {
-        logger.warn("[LUA] Call unchecked GetSceneUidList");
-        // TODO check
-        var scriptManager = sceneScriptManager.getIfExists();
-        if (scriptManager == null) {
-            return new LuaTable();
-        }
-        var players = scriptManager.getScene().getPlayers();
-        var result = new LuaTable();
-        for (int i = 0; i < players.size(); i++) {
-            result.set(Integer.toString(i + 1), players.get(i).getUid());
-        }
-        return result;
-    }
+		logger.warn("[LUA] Call unchecked GetSceneUidList");
+		// TODO check
+		var scriptManager = sceneScriptManager.getIfExists();
+		if (scriptManager == null) {
+			return new LuaTable();
+		}
+		var players = scriptManager.getScene().getPlayers();
+		var result = new LuaTable();
+
+		for (int i = 0; i < players.size(); i++) {
+			int index = i + 1;
+			int uid = players.get(i).getUid();
+			LuaValue luaUid = LuaValue.valueOf(uid);
+
+			// Numeric Lua array key: uid_list[1]
+			result.set(index, luaUid);
+
+			// String fallback key: uid_list["1"]
+			result.set(Integer.toString(index), uid);
+		}
+
+		return result;
+	}
 
     public long GetServerTime() {
         logger.warn("[LUA] Call unchecked GetServerTime");
@@ -1292,18 +1381,28 @@ public class ScriptLib {
     // TODO: RemoveExtraFlowSuite
 
     public int RemoveExtraGroupSuite(int groupId, int suite) {
-        logger.debug("[LUA] Call RemoveExtraGroupSuite with {},{}", groupId, suite);
-        SceneGroup group = getSceneScriptManager().getGroupById(groupId);
-        if (group == null || group.monsters == null) {
-            return 1;
-        }
-        var suiteData = group.getSuiteByIndex(suite);
-        if (suiteData == null) {
-            return 1;
-        }
-        this.getSceneScriptManager().removeGroupSuite(group, suiteData);
-        return 0;
-    }
+		int resolvedGroupId = resolveScriptGroupId(groupId);
+		logger.debug("[LUA] Call RemoveExtraGroupSuite with {},{} resolvedGroupId={}", groupId, suite, resolvedGroupId);
+
+		if (resolvedGroupId == 0) {
+			return 1;
+		}
+
+		SceneGroup group = getSceneScriptManager().getGroupById(resolvedGroupId);
+		if (group == null || group.monsters == null) {
+			logger.warn("[LUA] RemoveExtraGroupSuite failed: group={}, resolvedGroupId={}, suite={}",
+					groupId, resolvedGroupId, suite);
+			return 1;
+		}
+
+		var suiteData = group.getSuiteByIndex(suite);
+		if (suiteData == null) {
+			return 1;
+		}
+
+		this.getSceneScriptManager().removeGroupSuite(group, suiteData);
+		return 0;
+	}
 
     // TODO: ResumeAutoPoolMonsterTide
     // TODO: RevertPlayerRegionVision
@@ -1417,14 +1516,22 @@ public class ScriptLib {
     // TODO: SetGroupDead
 
     public int SetGroupGadgetStateByConfigId(int groupId, int configId, int gadgetState) {
-        logger.debug("[LUA] Call SetGroupGadgetStateByConfigId with {},{},{}", groupId, configId, gadgetState);
-        val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, groupId);
-        if (!(entity instanceof EntityGadget gadget)) {
-            return -1;
-        }
-        gadget.updateState(gadgetState);
-        return 0;
-    }
+		int resolvedGroupId = resolveScriptGroupId(groupId);
+		logger.debug("[LUA] Call SetGroupGadgetStateByConfigId with {},{},{} resolvedGroupId={}",
+				groupId, configId, gadgetState, resolvedGroupId);
+
+		if (resolvedGroupId == 0) {
+			return -1;
+		}
+
+		val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, resolvedGroupId);
+		if (!(entity instanceof EntityGadget gadget)) {
+			return -1;
+		}
+
+		gadget.updateState(gadgetState);
+		return 0;
+	}
 
     // TODO: SetGroupLogicStateValue
 
@@ -1562,10 +1669,25 @@ public class ScriptLib {
     }
 
     // TODO: SetPlatformRouteIndexToNext
-    // TODO: SetPlayerEyePoint
-    // TODO: SetPlayerEyePointLOD
-    // TODO: SetPlayerEyePointStream
-    // TODO: SetPlayerGroupVisionType
+    public int SetPlayerEyePoint(int regionConfigId) {
+		logger.debug("[LUA] Call unimplemented SetPlayerEyePoint with {}", regionConfigId);
+		return 0;
+	}
+
+	// TODO: SetPlayerEyePointLOD
+	// TODO: SetPlayerEyePointStream
+
+	public int SetPlayerGroupVisionType(LuaTable uidList, LuaTable visionTypeList) {
+		logger.debug(
+				"[LUA] Call unimplemented SetPlayerGroupVisionType with uidList={}, visionTypeList={}",
+				printTable(uidList),
+				printTable(visionTypeList)
+		);
+
+		// No-op fallback.
+		// This only controls special client vision/camera behavior around scripted areas. For Oceanid, failing this should not abort the boss script.
+		return 0;
+	}
 
     public int SetPlayerInteractOption(String var1) {
         logger.warn("[LUA] Call unimplemented SetPlayerInteractOption {}", var1);
@@ -1631,22 +1753,33 @@ public class ScriptLib {
     }
 
     public int SetWorktopOptionsByGroupId(int groupId, int configId, int[] options) {
-        logger.debug("[LUA] Call SetWorktopOptionsByGroupId with {},{},{}", groupId, configId, options);
-        val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, groupId);
+		int resolvedGroupId = resolveScriptGroupId(groupId);
+		logger.debug("[LUA] Call SetWorktopOptionsByGroupId with {},{},{} resolvedGroupId={}",
+				groupId, configId, options, resolvedGroupId);
 
-        if (!(entity instanceof EntityGadget gadget)) {
-            return 1;
-        }
+		if (resolvedGroupId == 0) {
+			return 1;
+		}
 
-        if (!(gadget.getContent() instanceof GadgetWorktop worktop)) {
-            return 2;
-        }
+		val entity = getSceneScriptManager().getScene().getEntityByConfigId(configId, resolvedGroupId);
 
-        worktop.addWorktopOptions(options);
-        this.getSceneScriptManager().getScene().broadcastPacket(new PacketWorktopOptionNotify(gadget));
+		if (!(entity instanceof EntityGadget gadget)) {
+			logger.warn("[LUA] SetWorktopOptionsByGroupId failed: no gadget for group={}, config={}",
+					resolvedGroupId, configId);
+			return 1;
+		}
 
-        return 0;
-    }
+		if (!(gadget.getContent() instanceof GadgetWorktop worktop)) {
+			logger.warn("[LUA] SetWorktopOptionsByGroupId failed: gadget group={}, config={} is not a worktop",
+					resolvedGroupId, configId);
+			return 2;
+		}
+
+		worktop.addWorktopOptions(options);
+		this.getSceneScriptManager().getScene().broadcastPacket(new PacketWorktopOptionNotify(gadget));
+
+		return 0;
+	}
 
     public int ShowClientGuide(String guideName) {
         logger.warn("[LUA] Call unchecked ShowClientGuide with {}", guideName);
@@ -1809,7 +1942,20 @@ public class ScriptLib {
     }
 
     // TODO: TryRecordActivityPushTips
-    // TODO: TrySetPlayerEyePoint
+
+	public int TrySetPlayerEyePoint(LuaTable smallRegion, LuaTable bigRegion, int enable, LuaTable visionTypeList) {
+		logger.debug(
+				"[LUA] Call unimplemented TrySetPlayerEyePoint with smallRegion={}, bigRegion={}, enable={}, visionTypeList={}",
+				printTable(smallRegion),
+				printTable(bigRegion),
+				enable,
+				printTable(visionTypeList)
+		);
+
+		// No-op fallback.
+		// This prevents old scripts from crashing when they try to enable a special camera/vision zone unsupported by LunaGC.
+		return 0;
+	}
 
     public int UnfreezeGroupLimit(int dungeonEntryId) {
         // Note: dungeonEntryId is also named pointId elsewhere in GC.
