@@ -20,30 +20,33 @@ public final class TeamInfo {
     public TeamInfo(List<Integer> avatars) {
         this.name = "";
         this.avatars = avatars;
+        this.ensureValidFields();
     }
 
     public String getName() {
+        this.ensureValidFields();
         return name;
     }
 
     public void setName(String name) {
-        this.name = name;
+        this.name = name == null ? "" : name;
     }
 
     public List<Integer> getAvatars() {
+        this.ensureValidFields();
         return avatars;
     }
 
     public int size() {
-        return avatars.size();
+        return getAvatars().size();
     }
 
     public boolean contains(Avatar avatar) {
-        return getAvatars().contains(avatar.getAvatarId());
+        return avatar != null && getAvatars().contains(avatar.getAvatarId());
     }
 
     public boolean addAvatar(Avatar avatar) {
-        if (contains(avatar)) {
+        if (avatar == null || contains(avatar)) {
             return false;
         }
 
@@ -67,6 +70,15 @@ public final class TeamInfo {
     }
 
     public void copyFrom(TeamInfo team, int maxTeamSize) {
+        this.ensureValidFields();
+
+        if (team == null) {
+            this.getAvatars().clear();
+            return;
+        }
+
+        team.ensureValidFields();
+
         // Clone avatar ids from team to copy from
         List<Integer> avatarIds = new ArrayList<>(team.getAvatars());
 
@@ -76,17 +88,80 @@ public final class TeamInfo {
         // Copy from team
         int len = Math.min(avatarIds.size(), maxTeamSize);
         for (int i = 0; i < len; i++) {
-            int id = avatarIds.get(i);
-            this.getAvatars().add(id);
+            Integer id = avatarIds.get(i);
+            if (id != null) {
+                this.getAvatars().add(id);
+            }
         }
     }
 
+    public void ensureValidFields() {
+        if (this.name == null) {
+            this.name = "";
+        }
+
+        if (this.avatars == null) {
+            this.avatars = new ArrayList<>(GAME_OPTIONS.avatarLimits.singlePlayerTeam);
+        }
+    }
+
+    public boolean sanitize(Player player, int maxTeamSize) {
+        boolean changed = false;
+
+        if (this.name == null) {
+            this.name = "";
+            changed = true;
+        }
+
+        if (this.avatars == null) {
+            this.avatars = new ArrayList<>(GAME_OPTIONS.avatarLimits.singlePlayerTeam);
+            return true;
+        }
+
+        LinkedHashSet<Integer> cleanedAvatarIds = new LinkedHashSet<>();
+
+        for (Integer avatarId : new ArrayList<>(this.avatars)) {
+            if (avatarId == null) {
+                changed = true;
+                continue;
+            }
+
+            if (cleanedAvatarIds.size() >= maxTeamSize) {
+                changed = true;
+                continue;
+            }
+
+            if (player == null || player.getAvatars().getAvatarById(avatarId) == null) {
+                changed = true;
+                continue;
+            }
+
+            if (!cleanedAvatarIds.add(avatarId)) {
+                changed = true;
+            }
+        }
+
+        List<Integer> cleanedList = new ArrayList<>(cleanedAvatarIds);
+        if (!this.avatars.equals(cleanedList)) {
+            this.avatars.clear();
+            this.avatars.addAll(cleanedList);
+            changed = true;
+        }
+
+        return changed;
+    }
+
     public AvatarTeam toProto(Player player) {
+        this.ensureValidFields();
+
         AvatarTeam.Builder avatarTeam = AvatarTeam.newBuilder().setTeamName(this.getName());
 
         for (int i = 0; i < this.getAvatars().size(); i++) {
             Avatar avatar = player.getAvatars().getAvatarById(this.getAvatars().get(i));
-            if (avatar == null) continue;
+
+            if (avatar == null) {
+                continue;
+            }
 
             avatarTeam.addAvatarGuidList(avatar.getGuid());
         }

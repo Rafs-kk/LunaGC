@@ -663,7 +663,7 @@ public final class PacketOpcodes {
     public static final int ActivityTakeWatcherRewardRsp = 1;
     public static final int ActivityUpdateWatcherNotify = 1;
     public static final int AddAranaraCollectionNotify = 1;
-    public static final int AddBackupAvatarTeamReq = 1;
+    public static final int AddBackupAvatarTeamReq = 2478;
     public static final int AddBackupAvatarTeamRsp = 1;
     public static final int AddBlacklistReq = 1;
     public static final int AddBlacklistRsp = 1;
@@ -949,8 +949,8 @@ public final class PacketOpcodes {
     public static final int DailyTaskUnlockedCitiesNotify = 1;
     public static final int DealAddFriendReq = 1;
     public static final int DeathZoneInfoNotify = 1;
-    public static final int DelBackupAvatarTeamReq = 1;
-    public static final int DelBackupAvatarTeamRsp = 1;
+    public static final int DelBackupAvatarTeamReq = 6527;
+    public static final int DelBackupAvatarTeamRsp = 1830; // may be incorrect
     public static final int DelScenePlayTeamEntityNotify = 1;
     public static final int DelTeamEntityNotify = 1;
     public static final int DelUgcDungeonReq = 1;

@@ -50,6 +50,9 @@ public final class TeamManager extends BasePlayerDataManager {
 
     @Transient @Getter @Setter
     private int previousIndex = -1; // index of character selection in team before adding trial avatar
+	
+	private static final int REL6_MAX_CONFIGURABLE_TEAMS = 20;
+	private static final int FIRST_BACKUP_TEAM_ID = GameConstants.DEFAULT_TEAMS + 1;
 
     public TeamManager() {
         this.mpTeam = new TeamInfo();
@@ -123,13 +126,20 @@ public final class TeamManager extends BasePlayerDataManager {
      * match could mean that the team does not currently belong to the player.
      */
     public int getTeamId(TeamInfo team) {
-        for (int i = 1; i <= this.teams.size(); i++) {
-            if (this.teams.get(i).equals(team)) {
-                return i;
-            }
-        }
-        return -1;
-    }
+		if (team == null || this.teams == null || this.teams.isEmpty()) {
+			return -1;
+		}
+
+		for (Map.Entry<Integer, TeamInfo> entry : this.teams.entrySet()) {
+			TeamInfo teamInfo = entry.getValue();
+
+			if (teamInfo != null && teamInfo.equals(team)) {
+				return entry.getKey();
+			}
+		}
+
+		return -1;
+	}
 
     public int getCurrentTeamId() {
         // Starts from 1
@@ -491,6 +501,11 @@ public final class TeamManager extends BasePlayerDataManager {
         // Clear current team info and add avatars from our new team
         teamInfo.getAvatars().clear();
         this.addAvatarsToTeam(teamInfo, newTeam);
+
+        this.sanitizeAvatarTeams();
+        if (this.getPlayer() != null) {
+            this.getPlayer().save();
+        }
     }
 
     public void setupMpTeam(List<Long> list) {
@@ -737,33 +752,27 @@ public final class TeamManager extends BasePlayerDataManager {
     }
 
     public synchronized void setCurrentTeam(int teamId) {
-        //
-        if (this.getPlayer().isInMultiplayer()) {
-            return;
-        }
-
-        // Get team
         TeamInfo teamInfo = this.getTeams().get(teamId);
         if (teamInfo == null || teamInfo.getAvatars().size() == 0) {
             return;
         }
 
-        // Set
         this.setCurrentTeamId(teamId);
         this.updateTeamEntities(new PacketChooseCurAvatarTeamRsp(teamId));
     }
 
     public synchronized void setTeamName(int teamId, String teamName) {
-        // Get team
         TeamInfo teamInfo = this.getTeams().get(teamId);
         if (teamInfo == null) {
             return;
         }
 
         teamInfo.setName(teamName);
-
-        // Packet
         this.getPlayer().sendPacket(new PacketChangeTeamNameRsp(teamId, teamName));
+
+        if (this.getPlayer() != null) {
+            this.getPlayer().save();
+        }
     }
 
     /**
@@ -997,46 +1006,89 @@ public final class TeamManager extends BasePlayerDataManager {
         }
     }
 
-    public void onPlayerLogin() { // Hack for now to fix resonances on login
+    public void onPlayerLogin() {
+        this.sanitizeAvatarTeams();
+        this.ensureSafeCurrentTeam();
+
+        // Rebuild transient active EntityAvatar list from the saved current team.
+        // This is especially important for backup teams, because after relog the persistent TeamInfo exists
+        // but the transient active-team entity list may not.
+        this.updateTeamEntities(null);
         this.updateTeamResonances();
+
+        if (this.getPlayer() != null) {
+            this.getPlayer().sendPacket(new PacketAvatarTeamAllDataNotify(this.getPlayer()));
+            this.getPlayer().sendPacket(new PacketAvatarTeamUpdateNotify(this.getPlayer()));
+            this.getPlayer().save();
+        }
     }
 
     public synchronized void addNewCustomTeam() {
-        // Sanity check - max number of teams.
-        if (this.teams.size() == GameConstants.MAX_TEAMS) {
-            player.sendPacket(new PacketAddBackupAvatarTeamRsp(Retcode.RET_FAIL));
-            return;
-        }
+        this.sanitizeAvatarTeams();
 
-        // The id of the new custom team is the lowest id in [5,MAX_TEAMS] that is not yet taken.
         int id = -1;
-        for (int i = 5; i <= GameConstants.MAX_TEAMS; i++) {
+        for (int i = FIRST_BACKUP_TEAM_ID; i <= REL6_MAX_CONFIGURABLE_TEAMS; i++) {
             if (!this.teams.containsKey(i)) {
                 id = i;
                 break;
             }
         }
 
-        // Create the new team.
-        this.teams.put(id, new TeamInfo());
+        if (id == -1) {
+            player.sendPacket(new PacketAddBackupAvatarTeamRsp(Retcode.RET_FAIL));
+            return;
+        }
 
-        // Send packets.
+        TeamInfo sourceTeam = this.getFallbackTeamForNewBackup();
+        TeamInfo newTeam = new TeamInfo();
+
+        if (sourceTeam != null) {
+            newTeam.copyFrom(sourceTeam, this.getMaxTeamSize());
+        }
+
+        // If something still went wrong, do not create an empty backup team.
+        if (newTeam.size() == 0) {
+            player.sendPacket(new PacketAddBackupAvatarTeamRsp(Retcode.RET_FAIL));
+            return;
+        }
+
+        this.teams.put(id, newTeam);
+
         player.sendPacket(new PacketAvatarTeamAllDataNotify(player));
         player.sendPacket(new PacketAddBackupAvatarTeamRsp());
+
+        if (this.getPlayer() != null) {
+            this.getPlayer().save();
+        }
     }
 
     public synchronized void removeCustomTeam(int id) {
-        // Check if the target id exists.
+        this.sanitizeAvatarTeams();
+
         if (!this.teams.containsKey(id)) {
             player.sendPacket(new PacketDelBackupAvatarTeamRsp(Retcode.RET_FAIL, id));
+            return;
         }
 
-        // Remove team.
+        if (id <= GameConstants.DEFAULT_TEAMS) {
+            player.sendPacket(new PacketDelBackupAvatarTeamRsp(Retcode.RET_FAIL, id));
+            return;
+        }
+
         this.teams.remove(id);
 
-        // Send packets.
+        if (this.currentTeamIndex == id) {
+            this.currentTeamIndex = this.getFirstUsableTeamId();
+            this.currentCharacterIndex = 0;
+            this.updateTeamEntities(null);
+        }
+
         player.sendPacket(new PacketAvatarTeamAllDataNotify(player));
         player.sendPacket(new PacketDelBackupAvatarTeamRsp(id));
+
+        if (this.getPlayer() != null) {
+            this.getPlayer().save();
+        }
     }
 
     /**
@@ -1235,4 +1287,158 @@ public final class TeamManager extends BasePlayerDataManager {
         // Update the team.
         if (trialAvatarIds.size() == 1) this.getPlayer().sendPacket(new PacketAvatarTeamUpdateNotify());
     }
+	
+    private boolean isUsableTeam(TeamInfo teamInfo) {
+        return this.hasAnyValidAvatar(teamInfo);
+    }
+
+    private int getFirstUsableTeamId() {
+        for (int i = 1; i <= GameConstants.DEFAULT_TEAMS; i++) {
+            TeamInfo teamInfo = this.teams.get(i);
+            if (this.isUsableTeam(teamInfo)) {
+                return i;
+            }
+        }
+
+        for (var entry : this.teams.entrySet()) {
+            if (this.isUsableTeam(entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+
+        return 1;
+    }
+
+    private TeamInfo getFallbackTeamForNewBackup() {
+        TeamInfo currentTeam = this.teams.get(this.currentTeamIndex);
+        if (this.isUsableTeam(currentTeam)) {
+            return currentTeam;
+        }
+
+        int fallbackId = this.getFirstUsableTeamId();
+        return this.teams.get(fallbackId);
+    }
+
+    public synchronized boolean sanitizeAvatarTeams() {
+        if (this.teams == null) {
+            this.teams = new LinkedHashMap<>();
+        }
+
+        boolean changed = false;
+        int maxTeamSize = this.getMaxTeamSize();
+
+        // Ensure the four default teams always exist.
+        for (int i = 1; i <= GameConstants.DEFAULT_TEAMS; i++) {
+            if (!this.teams.containsKey(i) || this.teams.get(i) == null) {
+                this.teams.put(i, new TeamInfo());
+                changed = true;
+            }
+        }
+
+        Iterator<Map.Entry<Integer, TeamInfo>> iterator = this.teams.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, TeamInfo> entry = iterator.next();
+
+            int teamId = entry.getKey();
+            TeamInfo teamInfo = entry.getValue();
+
+            if (teamId < 1 || teamId > REL6_MAX_CONFIGURABLE_TEAMS) {
+                iterator.remove();
+                changed = true;
+                continue;
+            }
+
+            if (teamInfo == null) {
+                if (teamId > GameConstants.DEFAULT_TEAMS) {
+                    iterator.remove();
+                } else {
+                    entry.setValue(new TeamInfo());
+                }
+
+                changed = true;
+                continue;
+            }
+
+            if (teamInfo.sanitize(this.getPlayer(), maxTeamSize)) {
+                changed = true;
+            }
+
+            // Critical REL6.0 safety:
+            // Backup teams that serialize to no valid avatars become hidden/question-mark parties
+            // and can softlock the client when edited or selected.
+            if (teamId > GameConstants.DEFAULT_TEAMS && !this.hasAnyValidAvatar(teamInfo)) {
+                iterator.remove();
+                changed = true;
+            }
+        }
+
+        if (!this.teams.containsKey(this.currentTeamIndex)
+                || !this.hasAnyValidAvatar(this.teams.get(this.currentTeamIndex))) {
+            this.currentTeamIndex = this.getFirstUsableTeamId();
+            this.currentCharacterIndex = 0;
+            changed = true;
+        }
+
+        TeamInfo currentTeam = this.teams.get(this.currentTeamIndex);
+        if (currentTeam != null
+                && currentTeam.getAvatars() != null
+                && (this.currentCharacterIndex < 0
+                        || this.currentCharacterIndex >= currentTeam.getAvatars().size())) {
+            this.currentCharacterIndex = 0;
+            changed = true;
+        }
+
+        if (changed && this.getPlayer() != null) {
+            this.getPlayer().save();
+        }
+
+        return changed;
+    }
+
+    private boolean hasAnyValidAvatar(TeamInfo teamInfo) {
+        if (teamInfo == null || teamInfo.getAvatars() == null || teamInfo.getAvatars().isEmpty()) {
+            return false;
+        }
+
+        if (this.getPlayer() == null || this.getPlayer().getAvatars() == null) {
+            return false;
+        }
+
+        for (Integer avatarId : new ArrayList<>(teamInfo.getAvatars())) {
+            if (avatarId != null && this.getPlayer().getAvatars().getAvatarById(avatarId) != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ensureSafeCurrentTeam() {
+        if (this.teams == null || this.teams.isEmpty()) {
+            this.teams = new LinkedHashMap<>();
+
+            for (int i = 1; i <= GameConstants.DEFAULT_TEAMS; i++) {
+                this.teams.put(i, new TeamInfo());
+            }
+        }
+
+        if (!this.teams.containsKey(this.currentTeamIndex)
+                || !this.hasAnyValidAvatar(this.teams.get(this.currentTeamIndex))) {
+            this.currentTeamIndex = this.getFirstUsableTeamId();
+            this.currentCharacterIndex = 0;
+        }
+
+        TeamInfo currentTeam = this.teams.get(this.currentTeamIndex);
+        if (currentTeam != null
+                && currentTeam.getAvatars() != null
+                && (this.currentCharacterIndex < 0
+                        || this.currentCharacterIndex >= currentTeam.getAvatars().size())) {
+            this.currentCharacterIndex = 0;
+        }
+    }
+
+	public boolean isUsingTemporaryTeam() {
+		return this.useTemporarilyTeamIndex >= 0;
+	}
 }

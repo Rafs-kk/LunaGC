@@ -1,27 +1,42 @@
 package emu.grasscutter.server.packet.send;
 
+import emu.grasscutter.GameConstants;
 import emu.grasscutter.game.player.Player;
-import emu.grasscutter.net.packet.*;
+import emu.grasscutter.net.packet.BasePacket;
+import emu.grasscutter.net.packet.PacketOpcodes;
 import emu.grasscutter.net.proto.AvatarTeamAllDataNotifyOuterClass.AvatarTeamAllDataNotify;
 
 public class PacketAvatarTeamAllDataNotify extends BasePacket {
     public PacketAvatarTeamAllDataNotify(Player player) {
         super(PacketOpcodes.AvatarTeamAllDataNotify);
 
-        AvatarTeamAllDataNotify.Builder proto = AvatarTeamAllDataNotify.newBuilder();
+        player.getTeamManager().sanitizeAvatarTeams();
 
-        // Add the id list for custom teams.
-        for (int id : player.getTeamManager().getTeams().keySet()) {
-            if (id > 4) {
-                proto.addBackupAvatarTeamOrderList(id);
-            }
-        }
+        var teamManager = player.getTeamManager();
 
-        // Add the avatar lists for all the teams the player has.
-        player
-                .getTeamManager()
+        AvatarTeamAllDataNotify.Builder proto =
+                AvatarTeamAllDataNotify.newBuilder()
+                        .setCurAvatarTeamId(teamManager.getCurrentTeamId());
+
+        teamManager
                 .getTeams()
-                .forEach((id, teamInfo) -> proto.putAvatarTeamMap(id, teamInfo.toProto(player)));
+                .forEach(
+                        (id, teamInfo) -> {
+                            proto.putAvatarTeamMap(id, teamInfo.toProto(player));
+
+                            if (id > GameConstants.DEFAULT_TEAMS) {
+                                proto.addBackupAvatarTeamOrderList(id);
+                            }
+                        });
+
+        // Important REL6.0 safety:
+        // Do not send tempAvatarGuidList for normal saved teams.
+        // When this list is sent during normal login, the 6.0 client can treat the active party as a temporary/hidden party instead of matching it to avatarTeamMap/curAvatarTeamId.
+        if (teamManager.isUsingTrialTeam() || teamManager.isUsingTemporaryTeam()) {
+            teamManager
+                    .getActiveTeam()
+                    .forEach(entity -> proto.addTempAvatarGuidList(entity.getAvatar().getGuid()));
+        }
 
         this.setData(proto);
     }
