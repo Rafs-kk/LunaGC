@@ -95,6 +95,14 @@
 * Spawns Oceanid’s Trounce Blossom after the fallback encounter is completed.
 * Resets Oceanid weather back to default after defeat and prevents immediate boss respawn until the player leaves the arena reset radius.
 * Added missing ScriptLib compatibility support used by Oceanid-related script paths.
+* Restored the Configure Team `+` button by wiring the REL6.0 `AddBackupAvatarTeamReq` opcode.
+* Restored the Disband button for non-default teams by wiring `DelBackupAvatarTeamReq` and decoding the REL6.0 backup team ID field.
+* Added safety handling for configurable backup teams so extra teams remain visible, editable, deployable, and persistent after relog.
+* New backup teams are created by cloning a valid existing team instead of creating an unsafe empty team, preventing hidden/empty party softlocks.
+* Prevented normal saved teams from being sent as temporary/hidden teams in `AvatarTeamAllDataNotify`.
+* Rebuilt active team state on login so extra teams can stay deployed normally after relog.
+* Fixed team lookup for sparse team IDs, such as editing Team 7 after disbanding Team 6 (for example).
+
 
 # Tested:
 
@@ -175,6 +183,14 @@
 * Confirmed randomized mimic waves spawn and progress the fallback fight.
 * Clearing all fallback waves defeats Oceanid and spawns the Trounce Blossom.
 * Confirmed the fight does not immediately restart while the reward blossom is active.
+* Added Teams 5, 6, and 7 through the Configure Team `+` button.
+* Edited each extra team with different characters.
+* Deployed Team 7 and confirmed it stayed selected, visible, and usable after relog.
+* Confirmed extra teams stayed populated and listed in Party Setup after relog.
+* Disbanded Team 6 and confirmed Teams 5 and 7 remained intact.
+* Confirmed deleted backup team IDs can be reused when adding a new team.
+* Edited an active backup team after deleting a middle team slot without crashes or softlocks.
+* Confirmed default Teams 1–4 cannot be disbanded.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
