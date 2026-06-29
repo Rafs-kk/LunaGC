@@ -102,7 +102,74 @@
 * Prevented normal saved teams from being sent as temporary/hidden teams in `AvatarTeamAllDataNotify`.
 * Rebuilt active team state on login so extra teams can stay deployed normally after relog.
 * Fixed team lookup for sparse team IDs, such as editing Team 7 after disbanding Team 6 (for example).
-
+* Added a missing-domain fallback framework for post-3.3 farming domains that load but do not provide working challenge logic.
+* Added fallback domain support using:
+  * Standard red challenge key / worktop option flow.
+  * Real `WorldChallenge` wave logic.
+  * Script-loaded combat groups.
+  * Script-loaded reward groups.
+  * Standard dungeon settle handling.
+  * Standard reward statue claim flow.
+  * Existing Obtained screen, Continue Challenge, and Leave Domain behavior.
+* Added scoped reward `statueDrop` overrides for domain IDs whose `DungeonExcelConfigData` entries do not point to usable reward tables.
+* Restored Sanctum of Rainbow Spirits:
+  * The Burning Gauntlet I-IV.
+  * Scenes 40792-40795.
+  * Dungeons 5018-5021.
+* Restored Ancient Watchtower:
+  * Domain of Forgery I-IV rotating variants.
+  * Scenes 40774-40777.
+* Restored Blazing Ruins:
+  * Domain of Mastery I-IV rotating variants.
+  * Scenes 40764-40767.
+* Restored Denouement of Sin:
+  * Harmony I-IV.
+  * Scenes 40780-40783.
+  * Dungeons 4480-4483.
+* Restored Faded Theater:
+  * Variation I-IV.
+  * Scenes 40788-40791.
+  * Dungeons 4510-4513.
+* Restored Waterfall Wen:
+  * Crumbling Assembly I-IV.
+  * Scenes 40784-40787.
+  * Dungeons 4484-4487.
+* Restored Pale Forgotten Glory:
+  * Rhyming Rhythm I-IV and rotating talent material variants.
+  * Scenes 40760-40763.
+* Restored Echoes of the Deep Tides:
+  * Domain of Forgery I-IV and rotating weapon ascension material variants.
+  * Scenes 40770-40773.
+* Restored Molten Iron Fortress:
+  * Forsaken Rampart I-IV.
+  * Scenes 40664-40667.
+  * Dungeons 5064-5067.
+* Restored City of Gold reward pool:
+  * Desert Citadel I-IV.
+  * Scenes 40660-40663.
+  * Dungeons 5060-5063.
+* Added mapped reward pools for restored artifact domains using boosted artifact-domain rates:
+  * I: boosted 3-star artifacts, chance-based 4-star artifacts, no 5-star artifacts.
+  * II: boosted 3-star artifacts, guaranteed/chance-based 4-star artifacts, no 5-star artifacts.
+  * III: boosted 3-star and 4-star artifacts, low-chance 5-star artifacts.
+  * IV: boosted 3-star and 4-star artifacts, boosted 5-star artifacts.
+* Added mapped reward pools for restored talent material domains using the Blazing Ruins-style distribution:
+  * I: 2-star books.
+  * II: 2-star and 3-star books.
+  * III: 2-star and 3-star books.
+  * IV: 2-star, 3-star, and boosted 4-star books.
+* Added mapped reward pools for restored weapon ascension material domains using the Ancient Watchtower-style distribution:
+  * I: 2-star materials.
+  * II: 2-star and 3-star materials.
+  * III: 2-star, 3-star, and 4-star materials.
+  * IV: 2-star, 3-star, 4-star, and low-chance 5-star materials.
+* Fixed missing challenge keys in restored domains.
+* Fixed empty/inactive combat arenas for restored farming domains.
+* Fixed reward statues not appearing or not activating in restored domains.
+* Fixed reward claims falling back to preview data for restored domains.
+* Fixed incorrect Molten Iron Fortress reward mapping that initially routed into Ridge Watch rewards.
+* Fixed Faded Theater reward interaction reliability by raising reward gadget 4001 to a usable interaction height while preserving the decorative 4002 gadget.
+* Fixed Molten Iron Fortress group loading by keeping fallback groups dynamically loaded and preventing fallback groups from unloading before starter key setup.
 
 # Tested:
 
@@ -191,6 +258,31 @@
 * Confirmed deleted backup team IDs can be reused when adding a new team.
 * Edited an active backup team after deleting a middle team slot without crashes or softlocks.
 * Confirmed default Teams 1–4 cannot be disbanded.
+* Tested restored domain challenge flow:
+  * Domain loads successfully.
+  * Challenge starter key appears.
+  * Worktop interaction starts challenge.
+  * Starter key is removed after activation.
+  * Challenge timer/counter appears.
+  * Enemy waves spawn correctly.
+  * Enemy kills advance wave logic.
+  * Dungeon clears successfully.
+  * Leaving timer appears after clear.
+  * Reward statue activates.
+  * Claim Rewards opens the Obtained screen.
+  * Continue Challenge button works.
+  * Leave Domain button works.
+* Tested restored reward pools:
+  * Sanctum of Rainbow Spirits artifact rewards.
+  * Ancient Watchtower rotating weapon material rewards.
+  * Blazing Ruins rotating talent book rewards.
+  * Denouement of Sin artifact rewards.
+  * Faded Theater artifact rewards.
+  * Waterfall Wen artifact rewards.
+  * Pale Forgotten Glory rotating talent book rewards.
+  * Echoes of the Deep Tides rotating weapon material rewards.
+  * Molten Iron Fortress artifact rewards.
+  * City of Gold artifact rewards.
 
 # Notes:
 * Ore durability is currently a simplified approximation. It's meant to make ores functional in LunaGC 6.0.0 to the best of my abilities, not perfectly match the official game’s mining behavior.
