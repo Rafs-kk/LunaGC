@@ -5,6 +5,7 @@ import emu.grasscutter.data.GameData;
 import emu.grasscutter.data.binout.ScenePointEntry;
 import emu.grasscutter.data.excels.dungeon.*;
 import emu.grasscutter.game.dungeons.handlers.DungeonBaseHandler;
+import emu.grasscutter.game.dungeons.fallback.MissingDomainFallbackManager;
 import emu.grasscutter.game.player.Player;
 import emu.grasscutter.game.props.SceneType;
 import emu.grasscutter.game.world.*;
@@ -106,10 +107,11 @@ public final class DungeonSystem extends BaseGameSystem {
         if (savePrevious) scene.setPrevScene(scene.getId());
 
         if (player.getWorld().transferPlayerToScene(player, sceneId, data)) {
-            scene = player.getScene();
-            scene.setDungeonManager(new DungeonManager(scene, data));
-            scene.addDungeonSettleObserver(basicDungeonSettleObserver);
-        }
+			scene = player.getScene();
+			scene.setDungeonManager(new DungeonManager(scene, data));
+			MissingDomainFallbackManager.install(scene, data);
+			scene.addDungeonSettleObserver(basicDungeonSettleObserver);
+		}
 
         if (savePrevious) scene.setPrevScenePoint(pointId);
         return true;
@@ -197,11 +199,12 @@ public final class DungeonSystem extends BaseGameSystem {
         // Destroy then create scene again to reinitialize script state
         scene.getPlayers().forEach(scene::removePlayer);
         if (player.getWorld().transferPlayerToScene(player, sceneId, dungeonData)) {
-            scene = player.getScene();
-            scene.setPrevScene(prevScene);
-            scene.setPrevScenePoint(pointId);
-            scene.setDungeonManager(new DungeonManager(scene, dungeonData));
-            scene.addDungeonSettleObserver(basicDungeonSettleObserver);
-        }
+			scene = player.getScene();
+			scene.setPrevScene(prevScene);
+			scene.setPrevScenePoint(pointId);
+			scene.setDungeonManager(new DungeonManager(scene, dungeonData));
+			MissingDomainFallbackManager.install(scene, dungeonData);
+			scene.addDungeonSettleObserver(basicDungeonSettleObserver);
+		}
     }
 }

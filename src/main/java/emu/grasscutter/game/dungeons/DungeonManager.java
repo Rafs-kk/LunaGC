@@ -7,6 +7,7 @@ import emu.grasscutter.data.excels.dungeon.*;
 import emu.grasscutter.game.activity.trialavatar.TrialAvatarActivityHandler;
 import emu.grasscutter.game.dungeons.dungeon_results.BaseDungeonResult;
 import emu.grasscutter.game.dungeons.enums.DungeonPassConditionType;
+import emu.grasscutter.game.dungeons.fallback.MissingDomainFallbackManager;
 import emu.grasscutter.game.inventory.GameItem;
 import emu.grasscutter.game.player.Player;
 import emu.grasscutter.game.props.*;
@@ -141,11 +142,17 @@ public final class DungeonManager {
         }
 
         // Get and roll rewards.
-        List<GameItem> rewards =
-                player
-                        .getServer()
-                        .getDropSystem()
-                        .handleDungeonRewardDrop(dungeonData.getStatueDrop(), useCondensed);
+        int statueDropId = dungeonData.getStatueDrop();
+        int fallbackStatueDropId = MissingDomainFallbackManager.getStatueDropOverride(dungeonData.getId());
+        if (fallbackStatueDropId != 0) {
+            statueDropId = fallbackStatueDropId;
+        }
+
+        List rewards = player
+                .getServer()
+                .getDropSystem()
+                .handleDungeonRewardDrop(statueDropId, useCondensed);
+		
         if (rewards.isEmpty()) {
             // fallback to legacy drop system
             Grasscutter.getLogger().debug("dungeon drop failed for {}", dungeonData.getId());
