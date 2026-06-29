@@ -34,7 +34,7 @@ This is possibly the only public PS with updated mob and gadget spawns! (Up to V
 - Have fun (or don't)
 
 ### Patching the game
-- Put [Astrolabe.dll](https://github.com/pmagixc/LunaGC/raw/6.0.0/patch/Astrolabe.dll) in the game directory
+- Put [Astrolabe.dll](https://github.com/Rafs-kk/LunaGC/blob/6.0.0/patch/Astrolabe.dll)) in the game directory
 - To "disable" the patch, just rename Astrolabe.dll to something else so it's not a DLL or don't name it Astrolabe (for example Astrolabe.deleleu / astrollable.dll)
 
 ### Getting started
