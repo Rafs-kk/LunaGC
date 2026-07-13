@@ -4,6 +4,8 @@ This is a personal fork of LunaGC for 6.0. I made this because I mostly play on 
 
 [List of changes/fixes](changes.md)
 
+# Notice: Development has been halted in favor of version 6.6 ([Check the 6.6.0 repository](https://github.com/Rafs-kk/LunaGC-6.6))
+
 ## Updated version of Grasscutters, with some new features implemented.
 
 Features and functionality of the ps is not guaranteed, try it yourself to see what works and what doesnt.
